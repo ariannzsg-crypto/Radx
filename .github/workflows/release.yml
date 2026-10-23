@@ -105,10 +105,10 @@ jobs:
           fi
 
       - name: Run unit tests
-        run: ./gradlew :app:testDebugUnitTest --no-daemon --console=plain
+        run: bash ./gradlew :app:testDebugUnitTest --no-daemon --console=plain
 
       - name: Build release APK
-        run: ./gradlew :app:assembleRelease --no-daemon --console=plain
+        run: bash ./gradlew :app:assembleRelease --no-daemon --console=plain
 
       - name: Name APK
         id: apk
