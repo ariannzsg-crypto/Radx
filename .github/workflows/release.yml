@@ -40,17 +40,20 @@ jobs:
         with:
           go-version: "1.23"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
+      # The ubuntu runner image already ships the Android SDK and cmdline-tools,
+      # so only the missing packages have to be installed here.
       - name: Install SDK packages
         run: |
+          echo "ANDROID_HOME=${ANDROID_HOME:-$ANDROID_SDK_ROOT}" >> "$GITHUB_ENV"
+          SDK_ROOT="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          echo "Using SDK at ${SDK_ROOT}"
+          sdkmanager --version
           yes | sdkmanager --licenses > /dev/null || true
           sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0" "ndk;${NDK_VERSION}"
           # sing-box's build script only checks that this license marker exists.
-          mkdir -p "${ANDROID_HOME}/licenses"
-          touch "${ANDROID_HOME}/licenses/android-sdk-license"
-          echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+          mkdir -p "${SDK_ROOT}/licenses"
+          touch "${SDK_ROOT}/licenses/android-sdk-license"
+          echo "ANDROID_NDK_HOME=${SDK_ROOT}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
 
       - name: Cache libbox.aar
         id: libbox-cache
