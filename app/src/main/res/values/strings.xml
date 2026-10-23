@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Radx</string>
+
+    <string name="tab_home">خانه</string>
+    <string name="tab_nodes">نودها</string>
+    <string name="tab_settings">تنظیمات</string>
+
+    <string name="connect">اتصال</string>
+    <string name="disconnect">قطع اتصال</string>
+    <string name="status_connected">متصل</string>
+    <string name="status_connecting">در حال اتصال…</string>
+    <string name="status_disconnecting">در حال قطع…</string>
+    <string name="status_disconnected">قطع</string>
+    <string name="status_error">خطا</string>
+    <string name="tap_connect">برای شروع، دکمه اتصال را بزنید</string>
+    <string name="protected_vpn">ترافیک شما از تونل Radx عبور می‌کند</string>
+    <string name="not_protected">ترافیک شما محافظت نمی‌شود</string>
+    <string name="proxy_running">پروکسی محلی روی %1$s فعال است</string>
+    <string name="current_node">نود فعال</string>
+    <string name="no_node_selected">نودی انتخاب نشده</string>
+    <string name="change_node">تغییر نود</string>
+    <string name="download">دانلود</string>
+    <string name="upload">آپلود</string>
+    <string name="error_label">خطا</string>
+
+    <string name="import_btn">افزودن کانفیگ</string>
+    <string name="import_title">افزودن کانفیگ</string>
+    <string name="import_tab_paste">پیست متن</string>
+    <string name="import_tab_url">لینک اشتراک</string>
+    <string name="import_tab_file">فایل</string>
+    <string name="paste_hint">لینک VMess / VLESS / Trojan / Shadowsocks یا کانفیگ Clash Meta (YAML) و sing-box (JSON) را اینجا بچسبانید</string>
+    <string name="url_hint">https://example.com/sub</string>
+    <string name="name_hint">نام (اختیاری)</string>
+    <string name="import_action">افزودن</string>
+    <string name="importing">در حال افزودن…</string>
+
+    <string name="profiles">کانفیگ‌ها</string>
+    <string name="no_profiles">هنوز کانفیگی اضافه نشده است</string>
+    <string name="update_subscription">به‌روزرسانی</string>
+    <string name="updating">در حال به‌روزرسانی…</string>
+    <string name="delete">حذف</string>
+    <string name="delete_profile_title">حذف کانفیگ</string>
+    <string name="delete_profile_message">«%1$s» حذف شود؟</string>
+    <string name="share">اشتراک‌گذاری</string>
+    <string name="copy_link">کپی لینک</string>
+    <string name="copy_config">کپی کانفیگ</string>
+    <string name="copied">کپی شد</string>
+    <string name="more">بیشتر</string>
+
+    <string name="nodes_title">نودها</string>
+    <string name="search_nodes">جستجوی نود…</string>
+    <string name="ping_all">تست تأخیر</string>
+    <string name="pinging">در حال تست…</string>
+    <string name="no_nodes">نودی موجود نیست</string>
+    <string name="node_delay_ms">%1$d میلی‌ثانیه</string>
+    <string name="node_delay_timeout">بی‌پاسخ</string>
+    <string name="nodes_count">%1$d نود</string>
+
+    <string name="settings">تنظیمات</string>
+    <string name="settings_core">هسته</string>
+    <string name="settings_core_singbox">sing-box</string>
+    <string name="settings_core_clash">Clash Meta</string>
+    <string name="settings_core_clash_unavailable">در این نسخه همراه نیست</string>
+    <string name="settings_tunnel_mode">حالت تونل</string>
+    <string name="settings_network">شبکه</string>
+    <string name="tunnel_vpn">حالت VPN (TUN)</string>
+    <string name="tunnel_vpn_desc">همه ترافیک دستگاه از طریق VPN عبور می‌کند</string>
+    <string name="tunnel_proxy">حالت پروکسی محلی</string>
+    <string name="tunnel_proxy_desc">پورت SOCKS/HTTP محلی برای برنامه‌ها (بدون مجوز VPN)</string>
+    <string name="settings_allow_lan">دسترسی از شبکه محلی</string>
+    <string name="settings_allow_lan_desc">اجازه اتصال دستگاه‌های دیگر به پروکسی (0.0.0.0)</string>
+    <string name="settings_ipv6">پشتیبانی IPv6</string>
+    <string name="settings_ipv6_desc">درخواست‌های IPv6 از تونل عبور کنند</string>
+    <string name="settings_dns_local">DNS محلی</string>
+    <string name="settings_dns_remote">DNS راه دور</string>
+    <string name="settings_notifications">اعلان وضعیت</string>
+    <string name="settings_notifications_desc">نمایش اعلان دائمی هنگام اتصال</string>
+    <string name="settings_about">درباره</string>
+    <string name="settings_version">نسخه</string>
+    <string name="settings_core_status">وضعیت هسته</string>
+    <string name="core_ready">آماده</string>
+    <string name="core_missing">نصب نشده — APK را از GitHub Releases نصب کنید</string>
+    <string name="about_text">Radx — کلاینت سریع و ساده VPN بر پایه sing-box</string>
+
+    <string name="error_no_profile">ابتدا یک کانفیگ اضافه کنید</string>
+    <string name="error_no_core">هسته sing-box در این نسخه وجود ندارد. APK رسمی را از بخش Releases نصب کنید.</string>
+    <string name="error_import_failed">افزودن کانفیگ ناموفق بود: %1$s</string>
+    <string name="error_url_required">آدرس اشتراک را وارد کنید</string>
+    <string name="error_empty_text">متنی وارد نشده است</string>
+    <string name="error_connection_failed">اتصال ناموفق: %1$s</string>
+    <string name="error_vpn_permission">مجوز VPN داده نشد</string>
+
+    <string name="subscription_label">اشتراک</string>
+    <string name="local_label">محلی</string>
+    <string name="import_success">%1$d نود اضافه شد</string>
+    <string name="updated_at">آخرین به‌روزرسانی: %1$s</string>
+
+    <string name="notification_channel_name">وضعیت اتصال</string>
+    <string name="notification_channel_desc">اعلان وضعیت تونل Radx</string>
+    <string name="notification_connected">متصل — %1$s</string>
+    <string name="notification_connecting">در حال اتصال…</string>
+    <string name="notification_action_disconnect">قطع</string>
+    <string name="notification_action_open">باز کردن</string>
+
+    <string name="close">بستن</string>
+    <string name="retry">تلاش دوباره</string>
+    <string name="apply">اعمال</string>
+    <string name="connected_time">مدت اتصال: %1$s</string>
+    <string name="traffic_total">%1$s</string>
+</resources>

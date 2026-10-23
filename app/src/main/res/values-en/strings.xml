@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Radx</string>
+
+    <string name="tab_home">Home</string>
+    <string name="tab_nodes">Nodes</string>
+    <string name="tab_settings">Settings</string>
+
+    <string name="connect">Connect</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="status_connected">Connected</string>
+    <string name="status_connecting">Connecting…</string>
+    <string name="status_disconnecting">Disconnecting…</string>
+    <string name="status_disconnected">Disconnected</string>
+    <string name="status_error">Error</string>
+    <string name="tap_connect">Tap connect to start</string>
+    <string name="protected_vpn">Your traffic is routed through the Radx tunnel</string>
+    <string name="not_protected">Your traffic is not protected</string>
+    <string name="proxy_running">Local proxy listening on %1$s</string>
+    <string name="current_node">Active node</string>
+    <string name="no_node_selected">No node selected</string>
+    <string name="change_node">Change node</string>
+    <string name="download">Download</string>
+    <string name="upload">Upload</string>
+    <string name="error_label">Error</string>
+
+    <string name="import_btn">Add config</string>
+    <string name="import_title">Add config</string>
+    <string name="import_tab_paste">Paste text</string>
+    <string name="import_tab_url">Subscription</string>
+    <string name="import_tab_file">File</string>
+    <string name="paste_hint">Paste a VMess / VLESS / Trojan / Shadowsocks link, a Clash Meta (YAML) profile or a sing-box (JSON) config</string>
+    <string name="url_hint">https://example.com/sub</string>
+    <string name="name_hint">Name (optional)</string>
+    <string name="import_action">Add</string>
+    <string name="importing">Adding…</string>
+
+    <string name="profiles">Configs</string>
+    <string name="no_profiles">No config added yet</string>
+    <string name="update_subscription">Update</string>
+    <string name="updating">Updating…</string>
+    <string name="delete">Delete</string>
+    <string name="delete_profile_title">Delete config</string>
+    <string name="delete_profile_message">Delete “%1$s”?</string>
+    <string name="share">Share</string>
+    <string name="copy_link">Copy link</string>
+    <string name="copy_config">Copy config</string>
+    <string name="copied">Copied</string>
+    <string name="more">More</string>
+
+    <string name="nodes_title">Nodes</string>
+    <string name="search_nodes">Search nodes…</string>
+    <string name="ping_all">Test latency</string>
+    <string name="pinging">Testing…</string>
+    <string name="no_nodes">No nodes available</string>
+    <string name="node_delay_ms">%1$d ms</string>
+    <string name="node_delay_timeout">Timeout</string>
+    <string name="nodes_count">%1$d nodes</string>
+
+    <string name="settings">Settings</string>
+    <string name="settings_core">Core</string>
+    <string name="settings_core_singbox">sing-box</string>
+    <string name="settings_core_clash">Clash Meta</string>
+    <string name="settings_core_clash_unavailable">not bundled in this build</string>
+    <string name="settings_tunnel_mode">Tunnel mode</string>
+    <string name="settings_network">Network</string>
+    <string name="tunnel_vpn">VPN mode (TUN)</string>
+    <string name="tunnel_vpn_desc">All device traffic goes through the VPN</string>
+    <string name="tunnel_proxy">Local proxy mode</string>
+    <string name="tunnel_proxy_desc">Local SOCKS/HTTP port for apps (no VPN permission)</string>
+    <string name="settings_allow_lan">Allow LAN access</string>
+    <string name="settings_allow_lan_desc">Let other devices use the proxy (0.0.0.0)</string>
+    <string name="settings_ipv6">IPv6 support</string>
+    <string name="settings_ipv6_desc">Route IPv6 traffic through the tunnel</string>
+    <string name="settings_dns_local">Local DNS</string>
+    <string name="settings_dns_remote">Remote DNS</string>
+    <string name="settings_notifications">Status notification</string>
+    <string name="settings_notifications_desc">Show an ongoing notification while connected</string>
+    <string name="settings_about">About</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_core_status">Core status</string>
+    <string name="core_ready">Ready</string>
+    <string name="core_missing">Not installed — install the APK from GitHub Releases</string>
+    <string name="about_text">Radx — a fast, simple VPN client powered by sing-box</string>
+
+    <string name="error_no_profile">Add a config first</string>
+    <string name="error_no_core">The sing-box core is missing from this build. Install the official APK from Releases.</string>
+    <string name="error_import_failed">Could not add the config: %1$s</string>
+    <string name="error_url_required">Enter a subscription URL</string>
+    <string name="error_empty_text">Nothing to import</string>
+    <string name="error_connection_failed">Connection failed: %1$s</string>
+    <string name="error_vpn_permission">VPN permission was not granted</string>
+
+    <string name="subscription_label">Subscription</string>
+    <string name="local_label">Local</string>
+    <string name="import_success">%1$d nodes added</string>
+    <string name="updated_at">Last update: %1$s</string>
+
+    <string name="notification_channel_name">Connection status</string>
+    <string name="notification_channel_desc">Radx tunnel status notifications</string>
+    <string name="notification_connected">Connected — %1$s</string>
+    <string name="notification_connecting">Connecting…</string>
+    <string name="notification_action_disconnect">Disconnect</string>
+    <string name="notification_action_open">Open</string>
+
+    <string name="close">Close</string>
+    <string name="retry">Retry</string>
+    <string name="apply">Apply</string>
+    <string name="connected_time">Connected for %1$s</string>
+    <string name="traffic_total">%1$s</string>
+</resources>

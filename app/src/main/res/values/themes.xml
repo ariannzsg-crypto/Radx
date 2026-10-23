@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Radx" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/radx_background</item>
+        <item name="android:statusBarColor">@color/radx_background</item>
+        <item name="android:navigationBarColor">@color/radx_background</item>
+        <item name="android:colorAccent">@color/radx_cyan</item>
+    </style>
+</resources>

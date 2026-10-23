@@ -1,0 +1,23 @@
+*.iml
+.gradle/
+local.properties
+.idea/
+.DS_Store
+build/
+app/build/
+captures/
+.externalNativeBuild
+.cxx
+*.log
+
+# Go core built by scripts/build-libbox.sh (see README)
+app/libs/libbox.aar
+
+# Local compile-verification toolchain
+.tooling/
+.tooling-*.log
+
+# Never commit signing material
+keystore.properties
+*.jks
+*.keystore
