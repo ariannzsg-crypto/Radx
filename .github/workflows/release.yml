@@ -44,16 +44,21 @@ jobs:
       # so only the missing packages have to be installed here.
       - name: Install SDK packages
         run: |
-          echo "ANDROID_HOME=${ANDROID_HOME:-$ANDROID_SDK_ROOT}" >> "$GITHUB_ENV"
-          SDK_ROOT="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
-          echo "Using SDK at ${SDK_ROOT}"
-          sdkmanager --version
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          SDKMANAGER=$(find "$SDK_ROOT/cmdline-tools" -maxdepth 3 -name sdkmanager -type f 2>/dev/null | head -1 || true)
+          if [ -z "$SDKMANAGER" ]; then SDKMANAGER=$(command -v sdkmanager || true); fi
+          if [ -z "$SDKMANAGER" ]; then echo "sdkmanager not found under $SDK_ROOT"; exit 1; fi
+          echo "Using $SDKMANAGER (SDK: $SDK_ROOT)"
+          export PATH="$(dirname "$SDKMANAGER"):$PATH"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
           yes | sdkmanager --licenses > /dev/null || true
           sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0" "ndk;${NDK_VERSION}"
           # sing-box's build script only checks that this license marker exists.
-          mkdir -p "${SDK_ROOT}/licenses"
-          touch "${SDK_ROOT}/licenses/android-sdk-license"
-          echo "ANDROID_NDK_HOME=${SDK_ROOT}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+          mkdir -p "$SDK_ROOT/licenses"
+          touch "$SDK_ROOT/licenses/android-sdk-license"
+          echo "ANDROID_NDK_HOME=$SDK_ROOT/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
 
       - name: Cache libbox.aar
         id: libbox-cache
