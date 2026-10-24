@@ -8,6 +8,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -19,6 +20,12 @@ import kotlinx.serialization.json.put
  *  - one `tun` inbound (VPN mode) or `mixed` inbound (local proxy mode)
  *  - a `selector` outbound named "proxy" over every parsed node
  *  - a minimal route: sniff, DNS hijack, LAN bypass, everything else to "proxy"
+ *
+ * The default resolver (`dns.final`) runs through the proxy, so the hostnames the
+ * core has to resolve *before* it can reach the proxy - the node servers themselves
+ * and the remote DNS endpoint - are pinned to the direct resolver. Without that the
+ * core tries to resolve the node through the proxy it is still dialing and fails
+ * with `DNS query loopback`, which leaves the tunnel up but passing no traffic.
  */
 object SingBoxConfigBuilder {
 
@@ -47,11 +54,11 @@ object SingBoxConfigBuilder {
             put(
                 "log",
                 buildJsonObject {
-                    put("level", "warn")
+                    put("level", "info")
                     put("timestamp", true)
                 },
             )
-            put("dns", dnsConfig(settings))
+            put("dns", dnsConfig(settings, bootstrapDomains(nodes)))
             put(
                 "inbounds",
                 buildJsonArray { add(inbound(settings)) },
@@ -114,7 +121,39 @@ object SingBoxConfigBuilder {
         return nodes[index].tag
     }
 
-    private fun dnsConfig(settings: AppSettings): JsonObject = buildJsonObject {
+    /**
+     * Node servers that are host names. The core has to resolve them to be able to dial
+     * the proxy at all, so the default (proxied) resolver would ask the very proxy it is
+     * still dialing and fail with `DNS query loopback`.
+     */
+    private fun bootstrapDomains(nodes: List<ProxyNode>): List<String> {
+        val domains = linkedSetOf<String>()
+        nodes.forEach { node ->
+            val server = (node.outbound["server"] as? JsonPrimitive)?.contentOrNull ?: node.server
+            val host = server.trim().trim('[', ']')
+            if (host.isNotEmpty() && !isIpLiteral(host)) domains += host
+        }
+        return domains.toList()
+    }
+
+    /** Bare host of a DNS address such as `https://dns.google/dns-query`. */
+    private fun hostOf(address: String): String? {
+        val withoutScheme = address.substringAfter("://", address)
+        var host = withoutScheme.substringBefore('/').substringAfterLast('@')
+        host = when {
+            host.startsWith("[") -> host.substringAfter('[').substringBefore(']')
+            host.count { it == ':' } == 1 -> host.substringBefore(':')
+            else -> host
+        }
+        return host.trim().ifEmpty { null }
+    }
+
+    private fun isIpLiteral(value: String): Boolean =
+        value.contains(':') || IPV4_HOST.matches(value)
+
+    private val IPV4_HOST = Regex("""^\d{1,3}(\.\d{1,3}){3}$""")
+
+    private fun dnsConfig(settings: AppSettings, bootstrap: List<String>): JsonObject = buildJsonObject {
         put(
             "servers",
             buildJsonArray {
@@ -123,6 +162,11 @@ object SingBoxConfigBuilder {
                         put("tag", "dns-remote")
                         put("address", settings.remoteDns)
                         put("detour", SELECTOR_TAG)
+                        // A DoH/DoT endpoint given by host name must be resolved before the
+                        // proxy exists, so bootstrap it through the direct resolver.
+                        hostOf(settings.remoteDns)
+                            ?.takeIf { !isIpLiteral(it) }
+                            ?.let { put("address_resolver", "dns-local") }
                     },
                 )
                 add(
@@ -136,6 +180,19 @@ object SingBoxConfigBuilder {
         )
         put("final", "dns-remote")
         put("strategy", if (settings.ipv6) "prefer_ipv4" else "ipv4_only")
+        if (bootstrap.isNotEmpty()) {
+            put(
+                "rules",
+                buildJsonArray {
+                    add(
+                        buildJsonObject {
+                            put("domain", buildJsonArray { bootstrap.forEach { add(it) } })
+                            put("server", "dns-local")
+                        },
+                    )
+                },
+            )
+        }
     }
 
     private fun inbound(settings: AppSettings): JsonObject =
