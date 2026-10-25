@@ -17,6 +17,9 @@ app/libs/libbox.aar
 .tooling/
 .tooling-*.log
 
+# Local diagnostics (sing-box test binary, captured logs)
+.diag/
+
 # Never commit signing material
 keystore.properties
 *.jks
