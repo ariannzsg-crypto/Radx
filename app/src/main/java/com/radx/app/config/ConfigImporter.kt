@@ -89,23 +89,29 @@ class ConfigImporter(
         }
 
         val decoded = ConfigUtils.decodeSubscriptionBody(text) ?: text
-        val nodes = collectLinks(decoded)
-        if (nodes.isEmpty()) {
-            throw IllegalArgumentException("No supported proxy link found")
+        val collected = collectLinks(decoded)
+        if (collected.nodes.isEmpty()) {
+            val reason = collected.warnings.firstOrNull()
+            throw IllegalArgumentException(
+                reason?.let { "No usable proxy link found. $it" } ?: "No supported proxy link found",
+            )
         }
         return Imported(
             kind = ProfileKind.LINKS,
-            nodes = ensureUniqueTags(nodes),
-            warnings = emptyList(),
+            nodes = ensureUniqueTags(collected.nodes),
+            warnings = collected.warnings,
             raw = text,
             subscriptionUrl = subscriptionUrl,
-            suggestedName = name ?: defaultName(nodes.first(), subscriptionUrl),
+            suggestedName = name ?: defaultName(collected.nodes.first(), subscriptionUrl),
         )
     }
 
-    private fun collectLinks(text: String): List<ProxyNode> {
+    private class CollectedLinks(val nodes: List<ProxyNode>, val warnings: List<String>)
+
+    private fun collectLinks(text: String): CollectedLinks {
         val nodes = mutableListOf<ProxyNode>()
         val candidates = mutableListOf<String>()
+        val skipped = linkedMapOf<String, Int>()
         for (line in text.lines()) {
             val trimmed = line.trim()
             if (trimmed.isEmpty() || trimmed.startsWith("//") || trimmed.startsWith("#")) continue
@@ -121,9 +127,20 @@ class ConfigImporter(
         }
         for (candidate in candidates) {
             val node = runCatching { ProxyLinkParser.parse(candidate) }.getOrNull()
-            if (node != null) nodes += node
+            if (node != null) {
+                nodes += node
+            } else {
+                // Keep track of links whose transport the core cannot run, so the user
+                // learns why part of a subscription disappeared.
+                ProxyLinkParser.unsupportedTransport(candidate)?.let { transport ->
+                    skipped[transport] = (skipped[transport] ?: 0) + 1
+                }
+            }
         }
-        return nodes
+        val warnings = skipped.map { (transport, count) ->
+            "$count node(s) skipped: the core does not support the $transport transport"
+        }
+        return CollectedLinks(nodes, warnings)
     }
 
     private fun defaultName(node: ProxyNode, subscriptionUrl: String?): String {

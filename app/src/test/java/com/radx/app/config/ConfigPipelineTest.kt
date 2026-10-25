@@ -115,6 +115,41 @@ class ConfigPipelineTest {
         assertNull(ProxyLinkParser.parse(""))
     }
 
+    @Test
+    fun `xhttp links are refused instead of becoming dead nodes`() {
+        val xhttp = "vless://uuid@cdn.example.com:443?security=tls&sni=cdn.example.com" +
+            "&type=xhttp&path=%2Fapi&mode=auto#XHTTP"
+
+        assertNull(ProxyLinkParser.parse(xhttp))
+        assertEquals("xhttp", ProxyLinkParser.unsupportedTransport(xhttp))
+        assertNull(ProxyLinkParser.unsupportedTransport("vless://uuid@example.com:443?security=tls#Plain"))
+    }
+
+    @Test
+    fun `importer keeps the reality nodes and warns about xhttp ones`() = runBlocking {
+        val links = listOf(
+            "vless://uuid@cdn.example.com:443?security=tls&sni=cdn.example.com&type=xhttp&path=%2Fapi#X1",
+            "vless://uuid@45.82.13.140:443?security=reality&sni=play.google.com&pbk=PUBKEY&sid=ab12" +
+                "&fp=chrome&type=tcp&flow=xtls-rprx-vision#REAL",
+        ).joinToString("\n")
+
+        val imported = ConfigImporter().importText(links, null)
+        assertEquals(1, imported.nodes.size)
+        assertEquals("REAL", imported.nodes[0].name)
+        assertEquals(1, imported.warnings.size)
+        assertTrue(imported.warnings[0].contains("xhttp"))
+    }
+
+    @Test
+    fun `a subscription of only unsupported transports explains itself`() {
+        val error = assertThrows(IllegalArgumentException::class.java) {
+            runBlocking {
+                ConfigImporter().importText("vless://uuid@cdn.example.com:443?type=xhttp#X1", null)
+            }
+        }
+        assertTrue(error.message!!.contains("xhttp"))
+    }
+
     // ------------------------------------------------------------- clash
 
     @Test

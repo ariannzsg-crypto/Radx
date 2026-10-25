@@ -49,6 +49,8 @@ object ProxyLinkParser {
         val serverName = source.string("sni") ?: source.string("host") ?: ""
         val path = source.string("path")
         val hostHeader = source.string("host")
+        // A transport the core cannot build would turn into a node that never connects.
+        if (!supportsTransport(network)) return null
 
         val outbound = buildJsonObject {
             put("type", "vmess")
@@ -73,6 +75,7 @@ object ProxyLinkParser {
         val name = cleanName(ep.fragment ?: "${ep.host}:${ep.port}")
         val security = query["security"]?.lowercase() ?: "none"
         val network = query["type"]?.lowercase() ?: "tcp"
+        if (!supportsTransport(network)) return null
 
         val outbound = buildJsonObject {
             put("type", "vless")
@@ -108,6 +111,7 @@ object ProxyLinkParser {
         val query = ep.query
         val name = cleanName(ep.fragment ?: "${ep.host}:${ep.port}")
         val network = query["type"]?.lowercase() ?: "tcp"
+        if (!supportsTransport(network)) return null
 
         val outbound = buildJsonObject {
             put("type", "trojan")
@@ -418,9 +422,51 @@ object ProxyLinkParser {
             if (!host.isNullOrBlank()) put("host", host)
         }
 
+        "httpupgrade" -> buildJsonObject {
+            put("type", "httpupgrade")
+            put("host", host?.takeIf { it.isNotBlank() } ?: "")
+            put("path", path?.takeIf { it.isNotBlank() } ?: "/")
+        }
+
         else -> null
+    }
+
+    /**
+     * Transports the core can run. XHTTP (and older KCP variants) exist only in other
+     * clients, so such links are refused instead of becoming nodes that never connect.
+     */
+    private fun supportsTransport(network: String): Boolean {
+        val name = network.trim().lowercase()
+        return name in PLAIN_TRANSPORTS || name in SUPPORTED_TRANSPORTS
+    }
+
+    /**
+     * The transport of a share link when the core has no support for it, else null.
+     * Lets the importer explain what it skipped instead of dropping nodes silently.
+     */
+    fun unsupportedTransport(link: String): String? {
+        val network = transportParam(link) ?: return null
+        val name = network.trim().lowercase()
+        return name.takeIf { it.isNotEmpty() && !supportsTransport(it) }
+    }
+
+    private fun transportParam(link: String): String? = when (ConfigUtils.schemeOf(link)) {
+        "vmess" -> ConfigUtils.decodeBase64(link.substringAfter("://"))
+            ?.let { decoded ->
+                runCatching { json.parseToJsonElement(decoded).jsonObject.string("net") }.getOrNull()
+            }
+
+        else -> link.substringAfter("://", "")
+            .substringAfter('?', "")
+            .takeIf { it.isNotEmpty() }
+            ?.split('&')
+            ?.firstOrNull { pair -> pair.substringBefore('=').equals("type", ignoreCase = true) }
+            ?.let { pair -> ConfigUtils.decodeComponent(pair.substringAfter('=', "")) }
     }
 
     private fun cleanName(raw: String): String =
         raw.trim().replace("\n", " ").replace("\r", " ").take(120).ifBlank { "Radx node" }
+
+    private val PLAIN_TRANSPORTS = setOf("", "tcp", "raw", "none")
+    private val SUPPORTED_TRANSPORTS = setOf("ws", "websocket", "grpc", "h2", "http", "quic", "httpupgrade")
 }
