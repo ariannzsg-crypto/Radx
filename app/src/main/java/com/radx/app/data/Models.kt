@@ -18,6 +18,10 @@ enum class TunnelMode { VPN, PROXY }
 /**
  * A single proxy outbound, already translated into sing-box outbound JSON so the
  * config builder only has to assemble them.
+ *
+ * [xray] is set for nodes whose transport sing-box cannot run (XHTTP). Those are
+ * started on the bundled Xray core and reached through a local SOCKS bridge, so
+ * [outbound] is replaced by a SOCKS outbound at config build time.
  */
 @Serializable
 data class ProxyNode(
@@ -27,7 +31,10 @@ data class ProxyNode(
     val server: String = "",
     val port: Int = 0,
     val outbound: JsonObject,
-)
+    val xray: JsonObject? = null,
+) {
+    val viaXray: Boolean get() = xray != null
+}
 
 @Serializable
 data class Profile(

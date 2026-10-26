@@ -49,8 +49,38 @@ object ProxyLinkParser {
         val serverName = source.string("sni") ?: source.string("host") ?: ""
         val path = source.string("path")
         val hostHeader = source.string("host")
-        // A transport the core cannot build would turn into a node that never connects.
+        // A transport neither core can build would turn into a node that never connects.
         if (!supportsTransport(network)) return null
+        if (isXrayTransport(network)) {
+            val options = buildMap {
+                put("security", source.string("tls")?.lowercase() ?: "none")
+                source.string("sni")?.let { put("sni", it) }
+                source.string("host")?.let { put("host", it) }
+                source.string("path")?.let { put("path", it) }
+                source.string("alpn")?.let { put("alpn", it) }
+                source.string("fp")?.let { put("fp", it) }
+                source.string("pbk")?.let { put("pbk", it) }
+                source.string("sid")?.let { put("sid", it) }
+                source.string("spx")?.let { put("spx", it) }
+                source.string("mode")?.let { put("mode", it) }
+                source.string("extra")?.let { put("extra", it) }
+                source.string("type")?.takeIf { network != "xhttp" }?.let { put("headertype", it) }
+            }
+            val user = buildJsonObject {
+                put("id", uuid)
+                put("alterId", source.int("aid") ?: 0)
+                put("security", source.string("scy") ?: "auto")
+            }
+            return ProxyNode(
+                tag = name,
+                name = name,
+                type = "vmess",
+                server = host,
+                port = port,
+                outbound = bridgePlaceholder(name),
+                xray = xrayVnext("vmess", host, port, user, network, options),
+            )
+        }
 
         val outbound = buildJsonObject {
             put("type", "vmess")
@@ -76,6 +106,19 @@ object ProxyLinkParser {
         val security = query["security"]?.lowercase() ?: "none"
         val network = query["type"]?.lowercase() ?: "tcp"
         if (!supportsTransport(network)) return null
+        // XHTTP only exists in Xray, so such nodes run there and are bridged into
+        // sing-box through a local SOCKS inbound.
+        if (isXrayTransport(network)) {
+            return ProxyNode(
+                tag = name,
+                name = name,
+                type = "vless",
+                server = ep.host,
+                port = ep.port,
+                outbound = bridgePlaceholder(name),
+                xray = xrayVless(ep.host, ep.port, uuid, network, query),
+            )
+        }
 
         val outbound = buildJsonObject {
             put("type", "vless")
@@ -112,6 +155,17 @@ object ProxyLinkParser {
         val name = cleanName(ep.fragment ?: "${ep.host}:${ep.port}")
         val network = query["type"]?.lowercase() ?: "tcp"
         if (!supportsTransport(network)) return null
+        if (isXrayTransport(network)) {
+            return ProxyNode(
+                tag = name,
+                name = name,
+                type = "trojan",
+                server = ep.host,
+                port = ep.port,
+                outbound = bridgePlaceholder(name),
+                xray = xrayTrojan(ep.host, ep.port, password, network, query),
+            )
+        }
 
         val outbound = buildJsonObject {
             put("type", "trojan")
@@ -301,6 +355,175 @@ object ProxyLinkParser {
         return ProxyNode(tag = name, name = name, type = "socks", server = ep.host, port = ep.port, outbound = outbound)
     }
 
+    // ------------------------------------------------------------- xray core
+
+    /**
+     * Stand-in outbound for a node that runs on the Xray core. The config builder
+     * replaces it with a SOCKS outbound pointing at the node's Xray port, so the
+     * placeholder never reaches a running core.
+     */
+    private fun bridgePlaceholder(tag: String): JsonObject = buildJsonObject {
+        put("type", "socks")
+        put("tag", tag)
+        put("server", "127.0.0.1")
+        put("server_port", 0)
+        put("version", "5")
+    }
+
+    private fun xrayVnext(
+        protocol: String,
+        host: String,
+        port: Int,
+        user: JsonObject,
+        network: String,
+        options: Map<String, String>,
+    ): JsonObject = buildJsonObject {
+        put("protocol", protocol)
+        put(
+            "settings",
+            buildJsonObject {
+                put(
+                    "vnext",
+                    buildJsonArray {
+                        add(
+                            buildJsonObject {
+                                put("address", host)
+                                put("port", port)
+                                put("users", buildJsonArray { add(user) })
+                            },
+                        )
+                    },
+                )
+            },
+        )
+        put("streamSettings", xrayStream(network, options))
+    }
+
+    private fun xrayVless(
+        host: String,
+        port: Int,
+        uuid: String,
+        network: String,
+        query: Map<String, String>,
+    ): JsonObject {
+        val user = buildJsonObject {
+            put("id", uuid)
+            put("encryption", query["encryption"]?.takeIf { it.isNotBlank() } ?: "none")
+            query["flow"]?.takeIf { it.isNotBlank() }?.let { put("flow", it) }
+        }
+        return xrayVnext("vless", host, port, user, network, query)
+    }
+
+    private fun xrayTrojan(
+        host: String,
+        port: Int,
+        password: String,
+        network: String,
+        query: Map<String, String>,
+    ): JsonObject =
+        buildJsonObject {
+            put("protocol", "trojan")
+            put(
+                "settings",
+                buildJsonObject {
+                    put(
+                        "servers",
+                        buildJsonArray {
+                            add(
+                                buildJsonObject {
+                                    put("address", host)
+                                    put("port", port)
+                                    put("password", password)
+                                },
+                            )
+                        },
+                    )
+                },
+            )
+            put("streamSettings", xrayStream(network, query))
+        }
+
+    /** Xray `streamSettings` for the transports sing-box cannot run. */
+    private fun xrayStream(network: String, options: Map<String, String>): JsonObject = buildJsonObject {
+        val transport = when (network.trim().lowercase()) {
+            "splithttp" -> "xhttp"
+            "mkcp" -> "kcp"
+            else -> network
+        }
+        put("network", transport)
+
+        val serverName = options["sni"]?.takeIf { it.isNotBlank() }
+            ?: options["peer"]?.takeIf { it.isNotBlank() }
+            ?: options["host"]?.substringBefore(',')?.substringBefore(';')?.takeIf { it.isNotBlank() }
+            ?: ""
+        val fingerprint = options["fp"]?.takeIf { it.isNotBlank() }
+        val alpn = ConfigUtils.alpnList(options["alpn"])
+
+        when (options["security"]?.trim()?.lowercase() ?: "none") {
+            "tls", "xtls" -> {
+                put("security", "tls")
+                put(
+                    "tlsSettings",
+                    buildJsonObject {
+                        put("serverName", serverName)
+                        if (fingerprint != null) put("fingerprint", fingerprint)
+                        if (alpn.isNotEmpty()) put("alpn", ConfigUtils.jsonStringList(alpn))
+                        // Current Xray dropped `allowInsecure` and refuses to load a
+                        // config that still carries it. The share-link equivalents are
+                        // a pinned certificate hash (`pcs`) or a pinned name (`vcn`).
+                        options["pcs"]?.takeIf { it.isNotBlank() }?.let { put("pinnedPeerCertSha256", it) }
+                        options["vcn"]?.takeIf { it.isNotBlank() }?.let { put("verifyPeerCertByName", it) }
+                    },
+                )
+            }
+
+            "reality" -> {
+                put("security", "reality")
+                put(
+                    "realitySettings",
+                    buildJsonObject {
+                        put("serverName", serverName)
+                        put("fingerprint", fingerprint ?: "chrome")
+                        put("publicKey", options["pbk"] ?: "")
+                        put("shortId", options["sid"] ?: "")
+                        options["spx"]?.takeIf { it.isNotBlank() }?.let { put("spiderX", it) }
+                    },
+                )
+            }
+
+            else -> put("security", "none")
+        }
+
+        when (transport) {
+            "xhttp" -> put(
+                "xhttpSettings",
+                buildJsonObject {
+                    put("path", options["path"]?.takeIf { it.isNotBlank() } ?: "/")
+                    options["host"]?.takeIf { it.isNotBlank() }?.let { put("host", it) }
+                    put("mode", options["mode"]?.takeIf { it.isNotBlank() } ?: "auto")
+                    options["extra"]?.let { raw ->
+                        runCatching { json.parseToJsonElement(raw).jsonObject }.getOrNull()
+                            ?.let { put("extra", it) }
+                    }
+                },
+            )
+
+            "kcp" -> put(
+                "kcpSettings",
+                buildJsonObject {
+                    put("mtu", 1350)
+                    put(
+                        "header",
+                        buildJsonObject {
+                            put("type", options["headertype"]?.takeIf { it.isNotBlank() } ?: "none")
+                        },
+                    )
+                    options["seed"]?.takeIf { it.isNotBlank() }?.let { put("seed", it) }
+                },
+            )
+        }
+    }
+
     // -------------------------------------------------------------- helpers
 
     private data class Endpoint(
@@ -432,13 +655,17 @@ object ProxyLinkParser {
     }
 
     /**
-     * Transports the core can run. XHTTP (and older KCP variants) exist only in other
-     * clients, so such links are refused instead of becoming nodes that never connect.
+     * Transports at least one bundled core can run. Anything else is refused instead
+     * of becoming a node that never connects.
      */
     private fun supportsTransport(network: String): Boolean {
         val name = network.trim().lowercase()
-        return name in PLAIN_TRANSPORTS || name in SUPPORTED_TRANSPORTS
+        return name in PLAIN_TRANSPORTS || name in SUPPORTED_TRANSPORTS || name in XRAY_TRANSPORTS
     }
+
+    /** Transports only the Xray core understands; those nodes run there. */
+    private fun isXrayTransport(network: String): Boolean =
+        network.trim().lowercase() in XRAY_TRANSPORTS
 
     /**
      * The transport of a share link when the core has no support for it, else null.
@@ -458,6 +685,7 @@ object ProxyLinkParser {
 
         else -> link.substringAfter("://", "")
             .substringAfter('?', "")
+            .substringBefore('#')
             .takeIf { it.isNotEmpty() }
             ?.split('&')
             ?.firstOrNull { pair -> pair.substringBefore('=').equals("type", ignoreCase = true) }
@@ -469,4 +697,5 @@ object ProxyLinkParser {
 
     private val PLAIN_TRANSPORTS = setOf("", "tcp", "raw", "none")
     private val SUPPORTED_TRANSPORTS = setOf("ws", "websocket", "grpc", "h2", "http", "quic", "httpupgrade")
+    private val XRAY_TRANSPORTS = setOf("xhttp", "splithttp", "kcp", "mkcp")
 }

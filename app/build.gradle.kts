@@ -21,9 +21,15 @@ android {
         applicationId = "com.radx.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.0.2"
+        versionCode = 4
+        versionName = "1.1.0"
         vectorDrawables.useSupportLibrary = true
+
+        // The bundled Xray core only ships for 64-bit architectures, so a 32-bit ABI
+        // would just produce a half-working APK.
+        ndk {
+            abiFilters += listOf("arm64-v8a", "x86_64")
+        }
     }
 
     val keystorePropertiesFile = rootProject.file("keystore.properties")
@@ -88,6 +94,12 @@ android {
     packaging {
         resources {
             excludes += setOf("/META-INF/{AL2.0,LGPL2.1}", "/META-INF/versions/**")
+        }
+        // The Xray core is an executable shipped in jniLibs as libxray.so. Android can
+        // only execute files that were unpacked from the APK, so native libraries must
+        // be extracted on install.
+        jniLibs {
+            useLegacyPackaging = true
         }
     }
 

@@ -115,39 +115,173 @@ class ConfigPipelineTest {
         assertNull(ProxyLinkParser.parse(""))
     }
 
-    @Test
-    fun `xhttp links are refused instead of becoming dead nodes`() {
-        val xhttp = "vless://uuid@cdn.example.com:443?security=tls&sni=cdn.example.com" +
-            "&type=xhttp&path=%2Fapi&mode=auto#XHTTP"
+    private val xhttpLink = "vless://11111111-2222-3333-4444-555555555555@cdn.example.com:443" +
+        "?security=tls&sni=front.example.com&fp=chrome&alpn=h2%2Chttp%2F1.1" +
+        "&type=xhttp&path=%2Fapi&host=cdn.example.com&mode=auto" +
+        "&extra=%7B%22xPaddingBytes%22%3A%22100-1000%22%7D#XHTTP"
 
-        assertNull(ProxyLinkParser.parse(xhttp))
-        assertEquals("xhttp", ProxyLinkParser.unsupportedTransport(xhttp))
-        assertNull(ProxyLinkParser.unsupportedTransport("vless://uuid@example.com:443?security=tls#Plain"))
+    @Test
+    fun `xhttp links run on the xray core`() {
+        val node = ProxyLinkParser.parse(xhttpLink)!!
+
+        assertTrue(node.viaXray)
+        // The sing-box side is only a placeholder until the config is built.
+        assertEquals("socks", node.outbound.string("type"))
+        assertEquals(0, node.outbound.int("server_port"))
+
+        val xray = node.xray!!
+        assertEquals("vless", xray.string("protocol"))
+        val user = xray["settings"]!!.jsonObject["vnext"]!!.jsonArray[0].jsonObject["users"]!!.jsonArray[0].jsonObject
+        assertEquals("11111111-2222-3333-4444-555555555555", user.string("id"))
+        assertEquals("none", user.string("encryption"))
+
+        val stream = xray["streamSettings"]!!.jsonObject
+        assertEquals("xhttp", stream.string("network"))
+        assertEquals("tls", stream.string("security"))
+        val tls = stream["tlsSettings"]!!.jsonObject
+        assertEquals("front.example.com", tls.string("serverName"))
+        assertEquals("chrome", tls.string("fingerprint"))
+        assertEquals(2, tls["alpn"]!!.jsonArray.size)
+
+        val xhttp = stream["xhttpSettings"]!!.jsonObject
+        assertEquals("/api", xhttp.string("path"))
+        assertEquals("cdn.example.com", xhttp.string("host"))
+        assertEquals("auto", xhttp.string("mode"))
+        assertEquals("100-1000", xhttp["extra"]!!.jsonObject.string("xPaddingBytes"))
     }
 
     @Test
-    fun `importer keeps the reality nodes and warns about xhttp ones`() = runBlocking {
+    fun `xray nodes are bridged into sing-box through their local socks port`() {
+        val reality = ProxyLinkParser.parse(
+            "vless://uuid@45.82.13.140:443?security=reality&sni=play.google.com&pbk=PUBKEY&sid=ab12" +
+                "&fp=chrome&type=tcp&flow=xtls-rprx-vision#REAL",
+        )!!
+        val profile = Profile(
+            id = "p",
+            name = "Mixed",
+            kind = ProfileKind.LINKS,
+            nodes = listOf(ProxyLinkParser.parse(xhttpLink)!!, reality),
+        )
+
+        val config = json.parseToJsonElement(SingBoxConfigBuilder.build(profile, AppSettings())).jsonObject
+        val outbounds = config["outbounds"]!!.jsonArray.map { it.jsonObject }
+
+        val bridged = outbounds.first { it.string("tag") == "XHTTP" }
+        assertEquals("socks", bridged.string("type"))
+        assertEquals("127.0.0.1", bridged.string("server"))
+        assertEquals(XrayBridge.port(0), bridged.int("server_port"))
+
+        // The reality node keeps its own sing-box outbound.
+        val direct = outbounds.first { it.string("tag") == "REAL" }
+        assertEquals("vless", direct.string("type"))
+        assertEquals("45.82.13.140", direct.string("server"))
+
+        // No placeholder port may survive into a config the core has to parse.
+        assertTrue(outbounds.none { it.string("type") == "socks" && it.int("server_port") == 0 })
+    }
+
+    @Test
+    fun `xray config gives every bridged node its own socks inbound`() {
+        val nodes = listOf(ProxyLinkParser.parse(xhttpLink)!!, ProxyLinkParser.parse(xhttpLink)!!)
+        val config = json.parseToJsonElement(XrayConfigBuilder.build(nodes)!!).jsonObject
+
+        val inbounds = config["inbounds"]!!.jsonArray.map { it.jsonObject }
+        assertEquals(2, inbounds.size)
+        assertEquals(XrayBridge.port(0), inbounds[0].int("port"))
+        assertEquals(XrayBridge.port(1), inbounds[1].int("port"))
+        assertEquals("socks", inbounds[0].string("protocol"))
+        assertEquals("127.0.0.1", inbounds[0].string("listen"))
+
+        val rules = config["routing"]!!.jsonObject["rules"]!!.jsonArray.map { it.jsonObject }
+        assertEquals(2, rules.size)
+        assertEquals(
+            XrayConfigBuilder.inboundTag(1),
+            rules[1]["inboundTag"]!!.jsonArray[0].jsonPrimitive.content,
+        )
+        assertEquals(XrayConfigBuilder.outboundTag(1), rules[1].string("outboundTag"))
+
+        val outbounds = config["outbounds"]!!.jsonArray.map { it.jsonObject }
+        assertEquals(XrayConfigBuilder.outboundTag(0), outbounds[0].string("tag"))
+        assertEquals("freedom", outbounds.last().string("protocol"))
+    }
+
+    @Test
+    fun `xray tls settings never carry the removed allowInsecure flag`() {
+        // Current Xray refuses to load a config that still has allowInsecure, which
+        // would take every Xray-backed node down at once.
+        val insecure = ProxyLinkParser.parse(
+            "vless://uuid@front.example.com:443?security=tls&sni=front.example.com" +
+                "&allowInsecure=1&type=xhttp&path=%2F#Insecure",
+        )!!
+        val tls = insecure.xray!!["streamSettings"]!!.jsonObject["tlsSettings"]!!.jsonObject
+        assertNull(tls["allowInsecure"])
+        assertEquals("front.example.com", tls.string("serverName"))
+
+        val pinned = ProxyLinkParser.parse(
+            "vless://uuid@front.example.com:443?security=tls&sni=a.example.com&type=xhttp" +
+                "&pcs=ABCDEF&vcn=b.example.com#Pinned",
+        )!!
+        val pinnedTls = pinned.xray!!["streamSettings"]!!.jsonObject["tlsSettings"]!!.jsonObject
+        assertEquals("ABCDEF", pinnedTls.string("pinnedPeerCertSha256"))
+        assertEquals("b.example.com", pinnedTls.string("verifyPeerCertByName"))
+    }
+
+    @Test
+    fun `xray config is only built when a node needs it`() {
+        val node = ProxyLinkParser.parse("vless://uuid@example.com:443?security=tls#Plain")!!
+        assertNull(XrayConfigBuilder.build(listOf(node)))
+    }
+
+    @Test
+    fun `without the xray core only the sing-box nodes are used`() {
+        val reality = ProxyLinkParser.parse("vless://uuid@example.com:443?security=tls#Plain")!!
+        val profile = Profile(
+            id = "p",
+            name = "Mixed",
+            kind = ProfileKind.LINKS,
+            nodes = listOf(ProxyLinkParser.parse(xhttpLink)!!, reality),
+        )
+
+        val config = json.parseToJsonElement(
+            SingBoxConfigBuilder.build(profile, AppSettings(), xrayAvailable = false),
+        ).jsonObject
+        val selector = config["outbounds"]!!.jsonArray[0].jsonObject
+        assertEquals(1, selector["outbounds"]!!.jsonArray.size)
+        assertEquals("Plain", selector.string("default"))
+
+        // A profile that only has Xray nodes cannot run at all.
+        val onlyXray = profile.copy(nodes = listOf(ProxyLinkParser.parse(xhttpLink)!!))
+        assertThrows(IllegalArgumentException::class.java) {
+            SingBoxConfigBuilder.build(onlyXray, AppSettings(), xrayAvailable = false)
+        }
+    }
+
+    @Test
+    fun `importer keeps xhttp nodes next to reality ones`() = runBlocking {
         val links = listOf(
-            "vless://uuid@cdn.example.com:443?security=tls&sni=cdn.example.com&type=xhttp&path=%2Fapi#X1",
+            xhttpLink,
             "vless://uuid@45.82.13.140:443?security=reality&sni=play.google.com&pbk=PUBKEY&sid=ab12" +
                 "&fp=chrome&type=tcp&flow=xtls-rprx-vision#REAL",
         ).joinToString("\n")
 
         val imported = ConfigImporter().importText(links, null)
-        assertEquals(1, imported.nodes.size)
-        assertEquals("REAL", imported.nodes[0].name)
-        assertEquals(1, imported.warnings.size)
-        assertTrue(imported.warnings[0].contains("xhttp"))
+        assertEquals(2, imported.nodes.size)
+        assertEquals(listOf("XHTTP", "REAL"), imported.nodes.map { it.name })
+        assertEquals(1, imported.nodes.count { it.viaXray })
+        assertTrue(imported.warnings.isEmpty())
     }
 
     @Test
-    fun `a subscription of only unsupported transports explains itself`() {
+    fun `a transport neither core can run explains itself`() {
+        val link = "vless://uuid@cdn.example.com:443?security=tls&type=meek#Odd"
+        assertNull(ProxyLinkParser.parse(link))
+        assertEquals("meek", ProxyLinkParser.unsupportedTransport(link))
+        assertNull(ProxyLinkParser.unsupportedTransport(xhttpLink))
+
         val error = assertThrows(IllegalArgumentException::class.java) {
-            runBlocking {
-                ConfigImporter().importText("vless://uuid@cdn.example.com:443?type=xhttp#X1", null)
-            }
+            runBlocking { ConfigImporter().importText(link, null) }
         }
-        assertTrue(error.message!!.contains("xhttp"))
+        assertTrue(error.message!!.contains("meek"))
     }
 
     // ------------------------------------------------------------- clash

@@ -15,12 +15,15 @@ import androidx.core.content.ContextCompat
 import com.radx.app.MainActivity
 import com.radx.app.R
 import com.radx.app.config.SingBoxConfigBuilder
+import com.radx.app.config.XrayBridge
+import com.radx.app.config.XrayConfigBuilder
 import com.radx.app.core.ConnectionState
 import com.radx.app.core.CoreEngine
 import com.radx.app.core.CoreProvider
 import com.radx.app.core.TunSetup
 import com.radx.app.core.TunSpec
 import com.radx.app.core.TunnelStatus
+import com.radx.app.core.XrayRunner
 import com.radx.app.data.RadxStore
 import com.radx.app.data.TunnelMode
 import kotlinx.coroutines.CoroutineScope
@@ -44,6 +47,7 @@ class RadxVpnService : VpnService() {
     private lateinit var store: RadxStore
 
     private var engine: CoreEngine? = null
+    private var xraySession: XrayRunner.Session? = null
     private var tunInterface: ParcelFileDescriptor? = null
     private var startJob: Job? = null
 
@@ -112,7 +116,25 @@ class RadxVpnService : VpnService() {
             val settings = store.readSettings()
 
             try {
-                val config = SingBoxConfigBuilder.build(profile, settings)
+                // Nodes whose transport only Xray understands run there, and sing-box
+                // reaches them through their local SOCKS port.
+                val xrayConfig = XrayConfigBuilder.build(profile.nodes)
+                var xrayReady = false
+                if (xrayConfig != null) {
+                    if (XrayRunner.isAvailable(this@RadxVpnService)) {
+                        val firstXrayIndex = profile.nodes.indexOfFirst { it.viaXray }
+                        xraySession = XrayRunner.start(
+                            this@RadxVpnService,
+                            xrayConfig,
+                            XrayBridge.port(firstXrayIndex.coerceAtLeast(0)),
+                        )
+                        xrayReady = true
+                    } else {
+                        Log.w(TAG, "xray core is not part of this build")
+                    }
+                }
+
+                val config = SingBoxConfigBuilder.build(profile, settings, xrayAvailable = xrayReady)
                 val implementation = CoreProvider.create()
                     ?: throw IllegalStateException(getString(R.string.error_no_core))
 
@@ -127,7 +149,7 @@ class RadxVpnService : VpnService() {
                 )
                 engine = implementation
 
-                val nodeName = profile.activeNode?.name ?: profile.name
+                val nodeName = SingBoxConfigBuilder.activeNode(profile, xrayReady)?.name ?: profile.name
                 TunnelStatus.update(
                     ConnectionState.Connected(
                         profileId = profile.id,
@@ -179,6 +201,8 @@ class RadxVpnService : VpnService() {
     private fun teardown() {
         runCatching { engine?.stop() }.onFailure { Log.w(TAG, "core stop failed", it) }
         engine = null
+        XrayRunner.stop(xraySession)
+        xraySession = null
         runCatching { tunInterface?.close() }
         tunInterface = null
     }

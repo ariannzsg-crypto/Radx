@@ -41,14 +41,12 @@ object SingBoxConfigBuilder {
         encodeDefaults = true
     }
 
-    fun build(profile: Profile, settings: AppSettings): String {
+    fun build(profile: Profile, settings: AppSettings, xrayAvailable: Boolean = true): String {
         require(profile.nodes.isNotEmpty()) { "This profile has no nodes" }
 
-        val nodes = assignTags(profile.nodes)
-        val activeIndex = profile.nodes
-            .indexOfFirst { it.tag == profile.selectedTag }
-            .takeIf { it >= 0 } ?: 0
-        val activeTag = nodes[activeIndex].tag
+        val nodes = usableNodes(profile, xrayAvailable)
+        require(nodes.isNotEmpty()) { "Every node of this profile needs the Xray core" }
+        val activeTag = nodes[activeIndex(profile, nodes)].tag
 
         val config = buildJsonObject {
             put(
@@ -114,11 +112,45 @@ object SingBoxConfigBuilder {
     }
 
     /** The tag of the currently selected node, after collision-free tagging. */
-    fun activeTag(profile: Profile): String? {
+    fun activeTag(profile: Profile, xrayAvailable: Boolean = true): String? {
         if (profile.nodes.isEmpty()) return null
-        val nodes = assignTags(profile.nodes)
-        val index = profile.nodes.indexOfFirst { it.tag == profile.selectedTag }.takeIf { it >= 0 } ?: 0
-        return nodes[index].tag
+        val nodes = usableNodes(profile, xrayAvailable)
+        if (nodes.isEmpty()) return null
+        return nodes[activeIndex(profile, nodes)].tag
+    }
+
+    /** The node the tunnel will actually use, which may differ if Xray is missing. */
+    fun activeNode(profile: Profile, xrayAvailable: Boolean = true): ProxyNode? {
+        val tag = activeTag(profile, xrayAvailable) ?: return null
+        return usableNodes(profile, xrayAvailable).firstOrNull { it.tag == tag }
+    }
+
+    /**
+     * The nodes this build can run. Nodes that need the Xray core are dropped when it
+     * is missing, and otherwise point at the local Xray SOCKS port that serves them.
+     */
+    private fun usableNodes(profile: Profile, xrayAvailable: Boolean): List<ProxyNode> =
+        assignTags(profile.nodes)
+            .withIndex()
+            .filter { (_, node) -> !node.viaXray || xrayAvailable }
+            .map { (index, node) ->
+                if (node.viaXray) {
+                    node.copy(outbound = bridgeOutbound(node.tag, XrayBridge.port(index)))
+                } else {
+                    node
+                }
+            }
+
+    private fun activeIndex(profile: Profile, nodes: List<ProxyNode>): Int =
+        nodes.indexOfFirst { it.tag == profile.selectedTag }.takeIf { it >= 0 } ?: 0
+
+    /** The sing-box outbound that hands a node over to the Xray process. */
+    private fun bridgeOutbound(tag: String, port: Int): JsonObject = buildJsonObject {
+        put("type", "socks")
+        put("tag", tag)
+        put("server", "127.0.0.1")
+        put("server_port", port)
+        put("version", "5")
     }
 
     /**

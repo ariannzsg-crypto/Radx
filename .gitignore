@@ -13,6 +13,9 @@ captures/
 # Go core built by scripts/build-libbox.sh (see README)
 app/libs/libbox.aar
 
+# Xray core executable fetched by the release workflow
+app/src/main/jniLibs/
+
 # Local compile-verification toolchain
 .tooling/
 .tooling-*.log
