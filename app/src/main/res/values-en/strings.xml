@@ -103,6 +103,17 @@
     <string name="notification_action_disconnect">Disconnect</string>
     <string name="notification_action_open">Open</string>
 
+    <string name="tab_logs">Logs</string>
+    <string name="logs_title">Core logs</string>
+    <string name="logs_empty">No log lines yet. Both cores report here once you connect.</string>
+    <string name="logs_copy">Copy log</string>
+    <string name="logs_clear">Clear</string>
+    <string name="logs_follow">Follow newest line</string>
+    <string name="logs_filter_all">All</string>
+    <string name="logs_filter_singbox">sing-box</string>
+    <string name="logs_filter_xray">Xray</string>
+    <string name="logs_filter_errors">Errors</string>
+
     <string name="close">Close</string>
     <string name="retry">Retry</string>
     <string name="apply">Apply</string>

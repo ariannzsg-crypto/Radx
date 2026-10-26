@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -43,6 +44,7 @@ import com.radx.app.data.Profile
 import com.radx.app.data.TunnelMode
 import com.radx.app.ui.components.ImportSheet
 import com.radx.app.ui.screens.HomeScreen
+import com.radx.app.ui.screens.LogsScreen
 import com.radx.app.ui.screens.NodesScreen
 import com.radx.app.ui.screens.SettingsScreen
 import kotlinx.coroutines.launch
@@ -114,6 +116,7 @@ fun RadxApp(viewModel: RadxViewModel) {
                 val items = listOf(
                     R.string.tab_home to Icons.Rounded.Home,
                     R.string.tab_nodes to Icons.Rounded.Dns,
+                    R.string.tab_logs to Icons.Rounded.ReceiptLong,
                     R.string.tab_settings to Icons.Rounded.Settings,
                 )
                 items.forEachIndexed { index, (title, icon) ->
@@ -156,6 +159,8 @@ fun RadxApp(viewModel: RadxViewModel) {
                     onSelect = viewModel::selectNode,
                     onPing = viewModel::pingAll,
                 )
+
+                2 -> LogsScreen(onCopy = copyText)
 
                 else -> SettingsScreen(
                     state = state,

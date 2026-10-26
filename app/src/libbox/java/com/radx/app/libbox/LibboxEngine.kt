@@ -9,6 +9,8 @@ import android.system.OsConstants
 import android.util.Log
 import com.radx.app.RadxApplication
 import com.radx.app.core.CoreEngine
+import com.radx.app.core.CoreLog
+import com.radx.app.core.LogSource
 import com.radx.app.core.TunSetup
 import com.radx.app.core.TunSpec
 import io.nekohasekai.libbox.BoxService
@@ -139,6 +141,7 @@ private class AndroidPlatform(private val tun: TunSetup?) : PlatformInterface {
 
     override fun writeLog(message: String) {
         Log.i(TAG, message)
+        CoreLog.add(LogSource.SING_BOX, message)
     }
 
     // ---------------------------------------------------- network interfaces

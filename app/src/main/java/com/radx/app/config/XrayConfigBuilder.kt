@@ -63,7 +63,9 @@ object XrayConfigBuilder {
             put(
                 "log",
                 buildJsonObject {
-                    put("loglevel", "warning")
+                    // "info" is what makes the log screen show which node a
+                    // connection used; the app keeps only the last few hundred lines.
+                    put("loglevel", "info")
                 },
             )
             put(

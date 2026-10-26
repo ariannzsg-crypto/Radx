@@ -48,11 +48,29 @@ object XrayRunner {
         val process = try {
             ProcessBuilder(binary(context).absolutePath, "run", "-c", configFile.absolutePath)
                 .redirectErrorStream(true)
-                .redirectOutput(ProcessBuilder.Redirect.appendTo(logFile))
                 .start()
         } catch (error: Exception) {
             throw IllegalStateException("Cannot start the Xray core: ${error.message}", error)
         }
+
+        // The core output feeds both the log screen and the on-disk log that error
+        // messages quote.
+        val writer = logFile.bufferedWriter()
+        Thread({
+            runCatching {
+                process.inputStream.bufferedReader().forEachLine { line ->
+                    runCatching {
+                        writer.write(line)
+                        writer.newLine()
+                        writer.flush()
+                    }
+                    CoreLog.add(LogSource.XRAY, line)
+                }
+            }
+            runCatching { writer.close() }
+        }, "xray-log").apply { isDaemon = true }.start()
+
+        CoreLog.add(LogSource.XRAY, "core started")
 
         val session = Session(process, directory)
         if (expectPort != null) {
@@ -68,11 +86,13 @@ object XrayRunner {
 
         if (!process.isAlive) {
             stop(session)
-            throw IllegalStateException("The Xray core exited: ${logTail(directory)}")
+            val reason = "The Xray core exited: ${logTail(directory)}"
+            CoreLog.add(LogSource.XRAY, reason)
+            throw IllegalStateException(reason)
         }
         // A slow device may answer later than the probe window; sing-box retries the
         // SOCKS dial per connection, so letting the session live is the right call.
-        Log.i(TAG, "xray core started (pid ${process.pid()})")
+        Log.i(TAG, "xray core started")
         return session
     }
 
@@ -81,6 +101,7 @@ object XrayRunner {
         runCatching { session.process.destroy() }
         val stopped = runCatching { session.process.waitFor(2, TimeUnit.SECONDS) }.getOrDefault(false)
         if (!stopped) runCatching { session.process.destroyForcibly() }
+        CoreLog.add(LogSource.XRAY, "core stopped")
     }
 
     /** Last lines of the core log, for error messages. */

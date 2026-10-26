@@ -103,6 +103,17 @@
     <string name="notification_action_disconnect">قطع</string>
     <string name="notification_action_open">باز کردن</string>
 
+    <string name="tab_logs">لاگ</string>
+    <string name="logs_title">لاگ هسته‌ها</string>
+    <string name="logs_empty">هنوز لاگی نیست. بعد از اتصال، خروجی هر دو هسته همین‌جا نشان داده می‌شود.</string>
+    <string name="logs_copy">کپی لاگ</string>
+    <string name="logs_clear">پاک کردن</string>
+    <string name="logs_follow">دنبال کردن خط جدید</string>
+    <string name="logs_filter_all">همه</string>
+    <string name="logs_filter_singbox">sing-box</string>
+    <string name="logs_filter_xray">Xray</string>
+    <string name="logs_filter_errors">خطاها</string>
+
     <string name="close">بستن</string>
     <string name="retry">تلاش دوباره</string>
     <string name="apply">اعمال</string>

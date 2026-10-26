@@ -19,6 +19,8 @@ import com.radx.app.config.XrayBridge
 import com.radx.app.config.XrayConfigBuilder
 import com.radx.app.core.ConnectionState
 import com.radx.app.core.CoreEngine
+import com.radx.app.core.CoreLog
+import com.radx.app.core.LogSource
 import com.radx.app.core.CoreProvider
 import com.radx.app.core.TunSetup
 import com.radx.app.core.TunSpec
@@ -131,6 +133,10 @@ class RadxVpnService : VpnService() {
                         xrayReady = true
                     } else {
                         Log.w(TAG, "xray core is not part of this build")
+                        CoreLog.add(
+                            LogSource.XRAY,
+                            "core missing from this build: ${profile.nodes.count { it.viaXray }} node(s) skipped",
+                        )
                     }
                 }
 
@@ -208,6 +214,7 @@ class RadxVpnService : VpnService() {
     }
 
     private fun fail(message: String) {
+        CoreLog.add(LogSource.SING_BOX, message)
         TunnelStatus.update(ConnectionState.Failed(message))
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
