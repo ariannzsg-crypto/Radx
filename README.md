@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/icon-512.png" width="160" alt="Radx" />
+</p>
+
 # Radx
 
 کلاینت VPN / پروکسی برای اندروید با Kotlin و Jetpack Compose، ساخته‌شده روی هسته‌ی **sing-box** (کتابخانه‌ی `libbox`) به‌همراه هسته‌ی **Xray** برای ترنسپورت‌هایی که sing-box نمی‌شناسد (مثل XHTTP).
