@@ -70,7 +70,9 @@ object XrayRunner {
             stop(session)
             throw IllegalStateException("The Xray core exited: ${logTail(directory)}")
         }
-        Log.i(TAG, "xray core is up after ${READY_TIMEOUT_MS}ms budget")
+        // A slow device may answer later than the probe window; sing-box retries the
+        // SOCKS dial per connection, so letting the session live is the right call.
+        Log.i(TAG, "xray core started (pid ${process.pid()})")
         return session
     }
 
