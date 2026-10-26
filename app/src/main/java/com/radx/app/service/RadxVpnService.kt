@@ -24,8 +24,12 @@ import com.radx.app.core.LogSource
 import com.radx.app.core.CoreProvider
 import com.radx.app.core.TunSetup
 import com.radx.app.core.TunSpec
+import com.radx.app.core.TunnelInfo
+import com.radx.app.core.TunnelInfoStore
 import com.radx.app.core.TunnelStatus
 import com.radx.app.core.XrayRunner
+import com.radx.app.data.AppSettings
+import com.radx.app.data.Profile
 import com.radx.app.data.RadxStore
 import com.radx.app.data.TunnelMode
 import kotlinx.coroutines.CoroutineScope
@@ -52,6 +56,10 @@ class RadxVpnService : VpnService() {
     private var xraySession: XrayRunner.Session? = null
     private var tunInterface: ParcelFileDescriptor? = null
     private var startJob: Job? = null
+
+    /** What the core asked the system for, kept so the UI can show the real interface. */
+    @Volatile
+    private var lastTunSpec: TunSpec? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -155,6 +163,8 @@ class RadxVpnService : VpnService() {
                 )
                 engine = implementation
 
+                publishTunnelInfo(profile, settings, xrayReady)
+
                 val nodeName = SingBoxConfigBuilder.activeNode(profile, xrayReady)?.name ?: profile.name
                 TunnelStatus.update(
                     ConnectionState.Connected(
@@ -211,6 +221,48 @@ class RadxVpnService : VpnService() {
         xraySession = null
         runCatching { tunInterface?.close() }
         tunInterface = null
+        lastTunSpec = null
+        TunnelInfoStore.clear()
+    }
+
+    /**
+     * Records the structure the tunnel ended up with: interface, routes, DNS, per-app
+     * scope and the Xray bridge. Shown in the app and in the log, which makes a failing
+     * setup readable without a debug build.
+     */
+    private fun publishTunnelInfo(profile: Profile, settings: AppSettings, xrayReady: Boolean) {
+        val spec = lastTunSpec
+        val xrayIndexes = profile.nodes.withIndex().filter { it.value.viaXray }.map { it.index }
+        val info = TunnelInfo(
+            mode = settings.tunnelMode,
+            core = runCatching { engine?.version }.getOrNull()?.takeIf { it.isNotBlank() }
+                ?: "sing-box",
+            mtu = spec?.mtu ?: 0,
+            ipv4Addresses = spec?.ipv4Addresses.orEmpty(),
+            ipv6Addresses = spec?.ipv6Addresses.orEmpty(),
+            ipv4Routes = spec?.ipv4Routes.orEmpty(),
+            ipv6Routes = spec?.ipv6Routes.orEmpty(),
+            dnsServers = listOfNotNull(spec?.dnsAddress?.substringBefore('/')),
+            autoRoute = spec?.autoRoute ?: false,
+            strictRoute = spec?.strictRoute ?: false,
+            includedApps = spec?.includePackages.orEmpty(),
+            excludedApps = spec?.excludePackages.orEmpty(),
+            xrayNodes = if (xrayReady) xrayIndexes.size else 0,
+            xrayPorts = if (xrayReady) xrayIndexes.map { XrayBridge.port(it) } else emptyList(),
+            proxyPort = if (settings.tunnelMode == TunnelMode.PROXY) {
+                SingBoxConfigBuilder.PROXY_PORT
+            } else {
+                0
+            },
+        )
+        TunnelInfoStore.set(info)
+        CoreLog.add(
+            LogSource.SING_BOX,
+            "tunnel ready: mode=${settings.tunnelMode} mtu=${info.mtu} " +
+                "addr=${info.addressLines.joinToString(",")} " +
+                "routes=${info.routeLines.size} dns=${info.dnsServers.joinToString(",")} " +
+                "xray=${info.xrayNodes}",
+        )
     }
 
     private fun fail(message: String) {
@@ -228,6 +280,7 @@ class RadxVpnService : VpnService() {
         override fun protect(fd: Int): Boolean = this@RadxVpnService.protect(fd)
 
         override fun establish(spec: TunSpec): Int {
+            lastTunSpec = spec
             val builder = Builder()
             builder.setSession(getString(R.string.app_name))
             builder.setMtu(if (spec.mtu in 1280..65535) spec.mtu else 9000)

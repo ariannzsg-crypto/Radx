@@ -20,6 +20,9 @@ import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Dns
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.Router
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -28,7 +31,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.radx.app.R
 import com.radx.app.core.ConnectionState
+import com.radx.app.core.TunnelInfo
 import com.radx.app.data.Profile
 import com.radx.app.data.TunnelMode
 import com.radx.app.ui.Formatters
@@ -113,6 +119,10 @@ fun HomeScreen(
 
         item {
             StatusSummary(connection = connection, elapsed = elapsed)
+        }
+
+        item {
+            TunnelStructureCard(info = state.tunnelInfo)
         }
 
         item {
@@ -284,6 +294,131 @@ private fun ActiveNodeCard(state: UiState, onOpenNodes: () -> Unit) {
                 tint = RadxTextSecondary,
             )
         }
+    }
+}
+
+@Composable
+private fun TunnelStructureCard(info: TunnelInfo?) {
+    if (info == null) return
+    var expanded by rememberSaveable { mutableStateOf(false) }
+
+    RadxCard {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Router,
+                contentDescription = null,
+                tint = RadxCyan,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.tunnel_structure),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    text = stringResource(
+                        if (info.isVpn) R.string.tunnel_vpn else R.string.tunnel_proxy,
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = RadxTextSecondary,
+                )
+            }
+            Icon(
+                imageVector = if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                contentDescription = stringResource(R.string.more),
+                tint = RadxTextSecondary,
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        if (info.isVpn) {
+            DetailRow(
+                label = stringResource(R.string.tunnel_interface),
+                value = info.addressLines.joinToString(" · ").ifEmpty {
+                    stringResource(R.string.tunnel_not_ready)
+                },
+            )
+            DetailRow(
+                label = stringResource(R.string.tunnel_routes),
+                value = info.routeLines.joinToString(" · ").ifEmpty {
+                    stringResource(R.string.tunnel_routes_auto)
+                },
+            )
+            if (expanded) {
+                DetailRow(stringResource(R.string.tunnel_mtu), info.mtu.toString())
+                DetailRow(
+                    label = stringResource(R.string.tunnel_dns),
+                    value = info.dnsServers.joinToString(" · ").ifEmpty {
+                        stringResource(R.string.tunnel_dns_system)
+                    },
+                )
+                DetailRow(
+                    label = stringResource(R.string.tunnel_routing),
+                    value = stringResource(
+                        R.string.tunnel_routing_value,
+                        onOff(info.autoRoute),
+                        onOff(info.strictRoute),
+                    ),
+                )
+                DetailRow(
+                    label = stringResource(R.string.tunnel_apps),
+                    value = info.excludedApps.joinToString(" · ").ifEmpty {
+                        stringResource(R.string.tunnel_apps_none)
+                    },
+                )
+            }
+        } else {
+            DetailRow(
+                label = stringResource(R.string.tunnel_proxy_address),
+                value = "127.0.0.1:${info.proxyPort}",
+            )
+        }
+
+        if (info.xrayNodes > 0) {
+            DetailRow(
+                label = stringResource(R.string.tunnel_xray_bridge),
+                value = stringResource(
+                    R.string.tunnel_xray_value,
+                    info.xrayNodes,
+                    "${info.xrayPorts.first()}–${info.xrayPorts.last()}",
+                ),
+            )
+        }
+
+        DetailRow(stringResource(R.string.tunnel_core), info.core)
+    }
+}
+
+@Composable
+private fun onOff(value: Boolean): String =
+    stringResource(if (value) R.string.tunnel_on else R.string.tunnel_off)
+
+@Composable
+private fun DetailRow(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = RadxTextSecondary,
+            modifier = Modifier.width(112.dp),
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 

@@ -52,6 +52,11 @@
     <string name="search_nodes">Search nodes…</string>
     <string name="ping_all">Test latency</string>
     <string name="pinging">Testing…</string>
+    <string name="sort_by_ping">Sort: %1$s</string>
+    <string name="sort_default">Default</string>
+    <string name="sort_fastest">Fastest</string>
+    <string name="sort_slowest">Slowest</string>
+    <string name="sort_name">Name</string>
     <string name="no_nodes">No nodes available</string>
     <string name="node_delay_ms">%1$d ms</string>
     <string name="node_delay_timeout">Timeout</string>
@@ -113,6 +118,25 @@
     <string name="logs_filter_singbox">sing-box</string>
     <string name="logs_filter_xray">Xray</string>
     <string name="logs_filter_errors">Errors</string>
+
+    <string name="tunnel_structure">Tunnel structure</string>
+    <string name="tunnel_interface">Interface</string>
+    <string name="tunnel_routes">Routes</string>
+    <string name="tunnel_routes_auto">Automatic (all traffic)</string>
+    <string name="tunnel_mtu">MTU</string>
+    <string name="tunnel_dns">DNS</string>
+    <string name="tunnel_dns_system">System</string>
+    <string name="tunnel_routing">Routing</string>
+    <string name="tunnel_routing_value">auto %1$s · strict %2$s</string>
+    <string name="tunnel_apps">Outside tunnel</string>
+    <string name="tunnel_apps_none">No app excluded</string>
+    <string name="tunnel_proxy_address">Local proxy</string>
+    <string name="tunnel_xray_bridge">Xray bridge</string>
+    <string name="tunnel_xray_value">%1$d node(s) · port %2$s</string>
+    <string name="tunnel_core">Core</string>
+    <string name="tunnel_not_ready">Waiting for the core</string>
+    <string name="tunnel_on">on</string>
+    <string name="tunnel_off">off</string>
 
     <string name="close">Close</string>
     <string name="retry">Retry</string>

@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Search
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -46,7 +48,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.radx.app.R
 import com.radx.app.data.ProxyNode
+import com.radx.app.ui.NodeSort
 import com.radx.app.ui.UiState
+import com.radx.app.ui.sortedByPing
 import com.radx.app.ui.components.DelayLabel
 import com.radx.app.ui.components.EmptyState
 import com.radx.app.ui.components.NodeTypeBadge
@@ -62,6 +66,7 @@ fun NodesScreen(
     val profile = state.selectedProfile
     var query by rememberSaveable { mutableStateOf("") }
     var autoPinged by rememberSaveable { mutableStateOf(false) }
+    var sort by rememberSaveable { mutableStateOf(NodeSort.DEFAULT) }
 
     LaunchedEffect(profile?.id) {
         if (profile != null && !autoPinged) {
@@ -70,13 +75,15 @@ fun NodesScreen(
         }
     }
 
-    val nodes = remember(profile?.nodes, query) {
-        profile?.nodes.orEmpty().filter { node ->
-            query.isBlank() ||
-                node.name.contains(query, ignoreCase = true) ||
-                node.server.contains(query, ignoreCase = true) ||
-                node.type.contains(query, ignoreCase = true)
-        }
+    val nodes = remember(profile?.nodes, query, sort, state.delays) {
+        profile?.nodes.orEmpty()
+            .filter { node ->
+                query.isBlank() ||
+                    node.name.contains(query, ignoreCase = true) ||
+                    node.server.contains(query, ignoreCase = true) ||
+                    node.type.contains(query, ignoreCase = true)
+            }
+            .sortedByPing(state.delays, sort)
     }
 
     Column(
@@ -136,7 +143,28 @@ fun NodesScreen(
             modifier = Modifier.fillMaxWidth(),
         )
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(10.dp))
+
+        if (profile != null && nodes.isNotEmpty()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedButton(
+                    onClick = { sort = sort.next },
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.Sort,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = stringResource(R.string.sort_by_ping, stringResource(sort.labelRes)),
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+        }
 
         when {
             profile == null -> EmptyState(

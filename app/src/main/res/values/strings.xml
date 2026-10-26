@@ -52,6 +52,11 @@
     <string name="search_nodes">جستجوی نود…</string>
     <string name="ping_all">تست تأخیر</string>
     <string name="pinging">در حال تست…</string>
+    <string name="sort_by_ping">ترتیب: %1$s</string>
+    <string name="sort_default">پیش‌فرض</string>
+    <string name="sort_fastest">سریع‌ترین</string>
+    <string name="sort_slowest">کندترین</string>
+    <string name="sort_name">نام</string>
     <string name="no_nodes">نودی موجود نیست</string>
     <string name="node_delay_ms">%1$d میلی‌ثانیه</string>
     <string name="node_delay_timeout">بی‌پاسخ</string>
@@ -113,6 +118,25 @@
     <string name="logs_filter_singbox">sing-box</string>
     <string name="logs_filter_xray">Xray</string>
     <string name="logs_filter_errors">خطاها</string>
+
+    <string name="tunnel_structure">ساختار تونل</string>
+    <string name="tunnel_interface">رابط</string>
+    <string name="tunnel_routes">مسیرها</string>
+    <string name="tunnel_routes_auto">خودکار (کل ترافیک)</string>
+    <string name="tunnel_mtu">MTU</string>
+    <string name="tunnel_dns">DNS</string>
+    <string name="tunnel_dns_system">سیستم</string>
+    <string name="tunnel_routing">مسیریابی</string>
+    <string name="tunnel_routing_value">خودکار %1$s · سخت‌گیرانه %2$s</string>
+    <string name="tunnel_apps">خارج از تونل</string>
+    <string name="tunnel_apps_none">برنامه‌ای مستثنی نشده</string>
+    <string name="tunnel_proxy_address">پروکسی محلی</string>
+    <string name="tunnel_xray_bridge">پل Xray</string>
+    <string name="tunnel_xray_value">%1$d نود · پورت %2$s</string>
+    <string name="tunnel_core">هسته</string>
+    <string name="tunnel_not_ready">در انتظار هسته</string>
+    <string name="tunnel_on">روشن</string>
+    <string name="tunnel_off">خاموش</string>
 
     <string name="close">بستن</string>
     <string name="retry">تلاش دوباره</string>

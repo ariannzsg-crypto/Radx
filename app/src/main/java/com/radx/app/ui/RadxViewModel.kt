@@ -11,6 +11,8 @@ import com.radx.app.config.ConfigImporter
 import com.radx.app.core.ConnectionState
 import com.radx.app.core.CoreProvider
 import com.radx.app.core.TrafficMonitor
+import com.radx.app.core.TunnelInfo
+import com.radx.app.core.TunnelInfoStore
 import com.radx.app.core.TunnelStatus
 import com.radx.app.data.AppSettings
 import com.radx.app.data.Profile
@@ -41,6 +43,8 @@ data class UiState(
     val selectedProfileId: String? = null,
     val settings: AppSettings = AppSettings(),
     val connection: ConnectionState = ConnectionState.Disconnected,
+    /** Structure of the running tunnel; null while nothing runs. */
+    val tunnelInfo: TunnelInfo? = null,
     val traffic: TrafficMonitor.Snapshot = TrafficMonitor.Snapshot(),
     val delays: Map<String, Int?> = emptyMap(),
     val pinging: Boolean = false,
@@ -106,6 +110,11 @@ class RadxViewModel(application: Application) : AndroidViewModel(application) {
                 if (connection is ConnectionState.Failed) {
                     sendEvent(connection.message, isError = true)
                 }
+            }
+        }
+        viewModelScope.launch {
+            TunnelInfoStore.info.collect { info ->
+                _state.update { it.copy(tunnelInfo = info) }
             }
         }
         startTrafficLoop()
