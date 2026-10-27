@@ -210,8 +210,13 @@ jobs:
           "$RADX" import "$RUNNER_TEMP/link.txt" --name smoke
           "$RADX" list
           "$RADX" nodes
-          "$RADX" gen --mode proxy --out "$RUNNER_TEMP/out" --cores "$CORES" --check
+          "$RADX" gen --mode proxy --out "$RUNNER_TEMP/out" --cores "$CORES" --check | tee "$RUNNER_TEMP/gen.log"
           test -s "$RUNNER_TEMP/out/sing-box.json"
+          # `gen --check` only verifies the config when it finds a core, so prove it did.
+          grep -q "sing-box check -> OK" "$RUNNER_TEMP/gen.log" || {
+            echo "::error::the tool did not verify the generated config with a real core"
+            exit 1
+          }
 
       - name: Fetch the Windows cores
         run: |

@@ -177,11 +177,11 @@ private fun generate(cli: Args, store: DesktopStore) {
         out.resolve("xray.json").also { Files.writeString(it, config); info("wrote $it") }
     }
     info("node: ${tunnel.node.name}  mode: ${settings.tunnelMode.name.lowercase()}")
-    if (cli.flag("check")) checkConfigs(singBoxFile, xrayFile)
+    if (cli.flag("check")) checkConfigs(singBoxFile, xrayFile, cli.value("cores"))
 }
 
-private fun checkConfigs(singBoxFile: Path, xrayFile: Path?) {
-    val singBox = Cores.find(Cores.SING_BOX)
+private fun checkConfigs(singBoxFile: Path, xrayFile: Path?, cores: String?) {
+    val singBox = Cores.find(Cores.SING_BOX, cores)
     if (singBox == null) {
         note("sing-box.exe was not found, so its config was not checked")
     } else {
@@ -189,7 +189,7 @@ private fun checkConfigs(singBoxFile: Path, xrayFile: Path?) {
         info("sing-box check -> ${if (code == 0) "OK" else "failed ($code)"}")
     }
     if (xrayFile != null) {
-        val xray = Cores.find(Cores.XRAY)
+        val xray = Cores.find(Cores.XRAY, cores)
         if (xray == null) {
             note("xray.exe was not found, so its config was not checked")
         } else {

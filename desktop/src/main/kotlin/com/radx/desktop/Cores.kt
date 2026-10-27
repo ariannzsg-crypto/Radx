@@ -26,17 +26,23 @@ object Cores {
      * tool, the working directory and finally `PATH`.
      */
     fun find(name: String, explicit: String? = null): Path? {
-        val candidates = buildList {
-            explicit?.takeIf { it.isNotBlank() }?.let { add(Paths.get(it).resolve(name)) }
-            System.getenv("RADX_CORES")?.takeIf { it.isNotBlank() }?.let { add(Paths.get(it).resolve(name)) }
-            installHome()?.let { add(it.resolve("cores").resolve(name)) }
-            add(Paths.get(System.getProperty("user.dir")).resolve(name))
-            add(Paths.get(System.getProperty("user.dir")).resolve("cores").resolve(name))
+        // A core folder assembled for the other platform (the CI smoke test uses the
+        // Linux binaries) holds the same files without the `.exe` suffix, so both names
+        // are tried before giving up.
+        val names = if (name.endsWith(".exe")) listOf(name, name.removeSuffix(".exe")) else listOf(name)
+        val directories = buildList {
+            explicit?.takeIf { it.isNotBlank() }?.let { add(Paths.get(it)) }
+            System.getenv("RADX_CORES")?.takeIf { it.isNotBlank() }?.let { add(Paths.get(it)) }
+            installHome()?.let { add(it.resolve("cores")) }
+            add(Paths.get(System.getProperty("user.dir")))
+            add(Paths.get(System.getProperty("user.dir")).resolve("cores"))
             System.getenv("PATH")?.split(java.io.File.pathSeparator).orEmpty().forEach { entry ->
-                if (entry.isNotBlank()) add(Paths.get(entry).resolve(name))
+                if (entry.isNotBlank()) add(Paths.get(entry))
             }
         }
-        return candidates.firstOrNull { Files.isRegularFile(it) }
+        return directories.asSequence()
+            .flatMap { directory -> names.asSequence().map { directory.resolve(it) } }
+            .firstOrNull { Files.isRegularFile(it) }
     }
 
     /**
