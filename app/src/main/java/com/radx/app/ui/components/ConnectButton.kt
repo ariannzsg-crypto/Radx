@@ -35,8 +35,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.dp
-import com.radx.app.ui.theme.RadxBlue
-import com.radx.app.ui.theme.RadxCyan
+import com.radx.app.ui.theme.LocalRadxAccent
 import com.radx.app.ui.theme.RadxSurfaceElevated
 import com.radx.app.ui.theme.RadxTextPrimary
 
@@ -48,6 +47,8 @@ fun ConnectButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val accent = LocalRadxAccent.current
+    val glass = LocalGlassEffects.current
     val transition = rememberInfiniteTransition(label = "connect_pulse")
     val rotation by transition.animateFloat(
         initialValue = 0f,
@@ -70,20 +71,29 @@ fun ConnectButton(
         Canvas(modifier = Modifier.size(240.dp)) {
             val stroke = 11.dp.toPx()
             val radius = size.minDimension / 2 - stroke
+            // Two soft haloes instead of a hard ring, so the orb reads as lit glass.
             drawCircle(
-                color = RadxCyan.copy(alpha = 0.10f * glow),
-                radius = radius - 10.dp.toPx(),
+                brush = Brush.radialGradient(
+                    colors = listOf(accent.primary.copy(alpha = 0.22f * glow), Color.Transparent),
+                    radius = radius,
+                ),
+                radius = radius,
             )
             drawCircle(
-                color = Color(0xFF1B2A42),
+                color = if (glass) Color(0x14FFFFFF) else Color(0xFF1B2A42),
                 radius = radius,
                 style = Stroke(width = stroke),
+            )
+            drawCircle(
+                color = accent.primary.copy(alpha = 0.18f),
+                radius = radius - stroke - 6.dp.toPx(),
+                style = Stroke(width = 1.dp.toPx()),
             )
             if (connected || busy) {
                 rotate(if (busy) rotation else 0f) {
                     drawArc(
                         brush = Brush.sweepGradient(
-                            listOf(Color.Transparent, RadxBlue, RadxCyan, Color.Transparent),
+                            listOf(Color.Transparent, accent.secondary, accent.primary, Color.Transparent),
                         ),
                         startAngle = -90f,
                         sweepAngle = 300f,
@@ -101,13 +111,33 @@ fun ConnectButton(
                 .size(172.dp)
                 .clip(CircleShape)
                 .background(
-                    if (connected) {
-                        Brush.linearGradient(listOf(RadxCyan, RadxBlue))
-                    } else {
-                        Brush.linearGradient(listOf(RadxSurfaceElevated, Color(0xFF121C2D)))
+                    when {
+                        connected -> Brush.linearGradient(listOf(accent.primary, accent.secondary))
+                        glass -> Brush.linearGradient(
+                            listOf(
+                                Color(0x2EFFFFFF),
+                                Color(0x0DFFFFFF),
+                                accent.primary.copy(alpha = 0.12f),
+                            ),
+                        )
+
+                        else -> Brush.linearGradient(listOf(RadxSurfaceElevated, Color(0xFF121C2D)))
                     },
                 )
-                .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                .border(
+                    width = 1.dp,
+                    brush = if (glass) {
+                        Brush.linearGradient(listOf(Color(0x47FFFFFF), Color(0x0FFFFFFF)))
+                    } else {
+                        Brush.linearGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.outline,
+                                MaterialTheme.colorScheme.outline,
+                            ),
+                        )
+                    },
+                    shape = CircleShape,
+                )
                 .clickable(onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
@@ -115,14 +145,14 @@ fun ConnectButton(
                 Icon(
                     imageVector = Icons.Rounded.PowerSettingsNew,
                     contentDescription = label,
-                    tint = if (connected) Color(0xFF04222B) else RadxCyan,
+                    tint = if (connected) accent.onPrimary else accent.primary,
                     modifier = Modifier.size(40.dp),
                 )
                 Spacer(Modifier.height(10.dp))
                 Text(
                     text = label,
                     style = MaterialTheme.typography.titleMedium,
-                    color = if (connected) Color(0xFF04222B) else RadxTextPrimary,
+                    color = if (connected) accent.onPrimary else RadxTextPrimary,
                 )
             }
         }

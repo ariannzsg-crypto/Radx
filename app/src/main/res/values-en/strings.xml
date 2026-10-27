@@ -81,6 +81,18 @@
     <string name="settings_dns_remote">Remote DNS</string>
     <string name="settings_notifications">Status notification</string>
     <string name="settings_notifications_desc">Show an ongoing notification while connected</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_glass">Glass effect</string>
+    <string name="settings_glass_desc">Translucent frosted surfaces over a tinted backdrop</string>
+    <string name="settings_accent">Accent colour</string>
+    <string name="accent_cyan">Cyan</string>
+    <string name="accent_blue">Blue</string>
+    <string name="accent_violet">Violet</string>
+    <string name="accent_emerald">Emerald</string>
+    <string name="settings_behaviour">Behaviour</string>
+    <string name="settings_auto_connect">Auto-connect on launch</string>
+    <string name="settings_auto_connect_desc">Bring the tunnel up as soon as the app opens, once the VPN permission is granted</string>
+    <string name="settings_xray_status">Xray core</string>
     <string name="settings_about">About</string>
     <string name="settings_version">Version</string>
     <string name="settings_core_status">Core status</string>
@@ -95,6 +107,7 @@
     <string name="error_empty_text">Nothing to import</string>
     <string name="error_connection_failed">Connection failed: %1$s</string>
     <string name="error_vpn_permission">VPN permission was not granted</string>
+    <string name="error_no_usable_xray_node">No node of this profile can be loaded by the Xray core</string>
 
     <string name="subscription_label">Subscription</string>
     <string name="local_label">Local</string>

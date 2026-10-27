@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.radx.app.R
 import com.radx.app.ui.Formatters
+import com.radx.app.ui.theme.LocalRadxAccent
 import com.radx.app.ui.theme.RadxCyan
 import com.radx.app.ui.theme.RadxError
 import com.radx.app.ui.theme.RadxSuccess
@@ -40,16 +41,10 @@ import com.radx.app.ui.theme.RadxWarning
 @Composable
 fun RadxCard(
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)),
-    ) {
-        Column(Modifier.padding(18.dp), content = content)
-    }
+    GlassPanel(modifier = modifier, onClick = onClick, content = content)
 }
 
 @Composable
@@ -120,10 +115,12 @@ fun TrafficTile(
     total: String,
     tint: Color,
 ) {
+    val glass = LocalGlassEffects.current
     Surface(
         modifier = modifier,
         shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+        color = if (glass) Color(0x14FFFFFF) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+        border = if (glass) BorderStroke(1.dp, Color(0x1FFFFFFF)) else null,
     ) {
         Row(
             modifier = Modifier.padding(14.dp),
@@ -164,13 +161,13 @@ fun NodeTypeBadge(type: String) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+            .background(LocalRadxAccent.current.primary.copy(alpha = 0.16f))
             .padding(horizontal = 8.dp, vertical = 4.dp),
     ) {
         Text(
             text = Formatters.protocolLabel(type),
             style = MaterialTheme.typography.labelSmall,
-            color = RadxCyan,
+            color = LocalRadxAccent.current.primary,
             fontWeight = FontWeight.SemiBold,
         )
     }
@@ -182,7 +179,7 @@ fun DelayLabel(delay: Int?, pinging: Boolean) {
         pinging -> CircularProgressIndicator(
             modifier = Modifier.size(14.dp),
             strokeWidth = 2.dp,
-            color = RadxCyan,
+            color = LocalRadxAccent.current.primary,
         )
 
         delay == null -> Text(

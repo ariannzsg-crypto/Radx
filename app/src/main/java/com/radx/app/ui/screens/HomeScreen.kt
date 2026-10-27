@@ -259,7 +259,7 @@ private fun StatusSummary(connection: ConnectionState, elapsed: String) {
 private fun ActiveNodeCard(state: UiState, onOpenNodes: () -> Unit) {
     val profile = state.selectedProfile
     val node = profile?.activeNode
-    RadxCard(modifier = Modifier.clickable(onClick = onOpenNodes)) {
+    RadxCard(onClick = onOpenNodes) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(

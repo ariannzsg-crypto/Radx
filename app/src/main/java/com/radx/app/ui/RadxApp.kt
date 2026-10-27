@@ -15,16 +15,13 @@ import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -34,6 +31,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -42,16 +40,31 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.radx.app.R
 import com.radx.app.data.Profile
 import com.radx.app.data.TunnelMode
+import com.radx.app.ui.components.GlassBackdrop
+import com.radx.app.ui.components.GlassNavBar
 import com.radx.app.ui.components.ImportSheet
+import com.radx.app.ui.components.LocalGlassEffects
 import com.radx.app.ui.screens.HomeScreen
 import com.radx.app.ui.screens.LogsScreen
 import com.radx.app.ui.screens.NodesScreen
 import com.radx.app.ui.screens.SettingsScreen
+import com.radx.app.ui.theme.RadxTheme
 import kotlinx.coroutines.launch
 
 @Composable
 fun RadxApp(viewModel: RadxViewModel) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    RadxTheme(accent = state.settings.accent) {
+        CompositionLocalProvider(LocalGlassEffects provides state.settings.glassEffects) {
+            GlassBackdrop {
+                RadxAppContent(state = state, viewModel = viewModel)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RadxAppContent(state: UiState, viewModel: RadxViewModel) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHost = remember { SnackbarHostState() }
@@ -60,6 +73,7 @@ fun RadxApp(viewModel: RadxViewModel) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var showImport by rememberSaveable { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<Profile?>(null) }
+    var autoConnectDone by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -107,29 +121,35 @@ fun RadxApp(viewModel: RadxViewModel) {
         context.startActivity(Intent.createChooser(intent, context.getString(R.string.share)))
     }
 
+    // Auto-connect never asks for the VPN permission itself: it only brings the tunnel
+    // up when the permission was granted on an earlier run.
+    LaunchedEffect(state.settings.autoConnect, state.selectedProfileId, autoConnectDone) {
+        if (autoConnectDone || !state.settings.autoConnect) return@LaunchedEffect
+        if (!state.coreBundled || state.selectedProfile == null) return@LaunchedEffect
+        if (state.connected || state.busy) return@LaunchedEffect
+        autoConnectDone = true
+        if (state.settings.tunnelMode == TunnelMode.VPN) {
+            if (VpnService.prepare(context) == null) viewModel.connect()
+        } else {
+            viewModel.connect()
+        }
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = Color.Transparent,
         snackbarHost = { SnackbarHost(snackbarHost) },
         bottomBar = {
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                val items = listOf(
+            GlassNavBar(
+                items = listOf(
                     R.string.tab_home to Icons.Rounded.Home,
                     R.string.tab_nodes to Icons.Rounded.Dns,
                     R.string.tab_logs to Icons.Rounded.ReceiptLong,
                     R.string.tab_settings to Icons.Rounded.Settings,
-                )
-                items.forEachIndexed { index, (title, icon) ->
-                    NavigationBarItem(
-                        selected = tab == index,
-                        onClick = { tab = index },
-                        icon = {
-                            Icon(imageVector = icon, contentDescription = stringResource(title))
-                        },
-                        label = { Text(stringResource(title)) },
-                    )
-                }
-            }
+                ),
+                selected = tab,
+                onSelect = { tab = it },
+            )
         },
     ) { padding ->
         Box(

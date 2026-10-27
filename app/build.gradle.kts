@@ -21,8 +21,8 @@ android {
         applicationId = "com.radx.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 6
-        versionName = "1.2.0"
+        versionCode = 7
+        versionName = "1.2.1"
         vectorDrawables.useSupportLibrary = true
 
         // The bundled Xray core only ships for 64-bit architectures, so a 32-bit ABI

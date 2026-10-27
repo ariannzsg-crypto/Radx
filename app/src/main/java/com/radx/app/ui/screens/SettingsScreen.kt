@@ -1,7 +1,10 @@
 package com.radx.app.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.Icon
@@ -26,29 +30,38 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.radx.app.BuildConfig
 import com.radx.app.R
+import com.radx.app.core.XrayRunner
+import com.radx.app.data.AccentColor
 import com.radx.app.data.AppSettings
 import com.radx.app.data.CoreKind
 import com.radx.app.data.TunnelMode
 import com.radx.app.ui.UiState
 import com.radx.app.ui.components.RadxCard
 import com.radx.app.ui.components.SectionHeader
+import com.radx.app.ui.theme.LocalRadxAccent
 import com.radx.app.ui.theme.RadxCyan
 import com.radx.app.ui.theme.RadxSuccess
 import com.radx.app.ui.theme.RadxTextSecondary
+import com.radx.app.ui.theme.accentOf
 
 @Composable
 fun SettingsScreen(
     state: UiState,
     onUpdate: ((AppSettings) -> AppSettings) -> Unit,
 ) {
+    val context = LocalContext.current
+    val xrayReady = remember { XrayRunner.isAvailable(context) }
     var localDns by rememberSaveable { mutableStateOf(state.settings.localDns) }
     var remoteDns by rememberSaveable { mutableStateOf(state.settings.remoteDns) }
 
@@ -105,6 +118,47 @@ fun SettingsScreen(
                     selected = state.settings.tunnelMode == TunnelMode.PROXY,
                     enabled = true,
                     onClick = { onUpdate { it.copy(tunnelMode = TunnelMode.PROXY) } },
+                )
+            }
+        }
+
+        item {
+            RadxCard {
+                SectionHeader(title = stringResource(R.string.settings_appearance))
+                Spacer(Modifier.height(4.dp))
+                SwitchRow(
+                    title = stringResource(R.string.settings_glass),
+                    subtitle = stringResource(R.string.settings_glass_desc),
+                    checked = state.settings.glassEffects,
+                    onCheckedChange = { value -> onUpdate { it.copy(glassEffects = value) } },
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = stringResource(R.string.settings_accent),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    AccentColor.entries.forEach { accent ->
+                        AccentSwatch(
+                            accent = accent,
+                            selected = state.settings.accent == accent,
+                            onClick = { onUpdate { it.copy(accent = accent) } },
+                        )
+                    }
+                }
+            }
+        }
+
+        item {
+            RadxCard {
+                SectionHeader(title = stringResource(R.string.settings_behaviour))
+                Spacer(Modifier.height(4.dp))
+                SwitchRow(
+                    title = stringResource(R.string.settings_auto_connect),
+                    subtitle = stringResource(R.string.settings_auto_connect_desc),
+                    checked = state.settings.autoConnect,
+                    onCheckedChange = { value -> onUpdate { it.copy(autoConnect = value) } },
                 )
             }
         }
@@ -187,12 +241,17 @@ fun SettingsScreen(
                 Spacer(Modifier.height(8.dp))
                 InfoRow(
                     label = stringResource(R.string.settings_version),
-                    value = BuildConfig.VERSION_NAME,
+                    value = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                 )
                 InfoRow(
                     label = stringResource(R.string.settings_core_status),
                     value = stringResource(if (state.coreBundled) R.string.core_ready else R.string.core_missing),
                     highlight = state.coreBundled,
+                )
+                InfoRow(
+                    label = stringResource(R.string.settings_xray_status),
+                    value = stringResource(if (xrayReady) R.string.core_ready else R.string.core_missing),
+                    highlight = xrayReady,
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
@@ -204,6 +263,41 @@ fun SettingsScreen(
         }
 
         item { Spacer(Modifier.height(8.dp)) }
+    }
+}
+
+@Composable
+private fun AccentSwatch(
+    accent: AccentColor,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val palette = accentOf(accent)
+    Box(
+        modifier = Modifier
+            .size(38.dp)
+            .clip(CircleShape)
+            .background(palette.primary)
+            .border(
+                width = if (selected) 2.dp else 1.dp,
+                color = if (selected) {
+                    LocalRadxAccent.current.primary
+                } else {
+                    MaterialTheme.colorScheme.outline
+                },
+                shape = CircleShape,
+            )
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (selected) {
+            Icon(
+                imageVector = Icons.Rounded.Check,
+                contentDescription = null,
+                tint = palette.onPrimary,
+                modifier = Modifier.size(18.dp),
+            )
+        }
     }
 }
 

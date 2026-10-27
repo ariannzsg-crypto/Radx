@@ -81,6 +81,18 @@
     <string name="settings_dns_remote">DNS راه دور</string>
     <string name="settings_notifications">اعلان وضعیت</string>
     <string name="settings_notifications_desc">نمایش اعلان دائمی هنگام اتصال</string>
+    <string name="settings_appearance">ظاهر</string>
+    <string name="settings_glass">حالت شیشه‌ای</string>
+    <string name="settings_glass_desc">سطوح نیمه‌شفاف با پس‌زمینه‌ی رنگی</string>
+    <string name="settings_accent">رنگ تأکیدی</string>
+    <string name="accent_cyan">فیروزه‌ای</string>
+    <string name="accent_blue">آبی</string>
+    <string name="accent_violet">بنفش</string>
+    <string name="accent_emerald">زمردی</string>
+    <string name="settings_behaviour">رفتار</string>
+    <string name="settings_auto_connect">اتصال خودکار هنگام باز شدن</string>
+    <string name="settings_auto_connect_desc">اگر مجوز VPN قبلاً داده شده باشد، تونل بلافاصله بالا می‌آید</string>
+    <string name="settings_xray_status">هسته Xray</string>
     <string name="settings_about">درباره</string>
     <string name="settings_version">نسخه</string>
     <string name="settings_core_status">وضعیت هسته</string>
@@ -95,6 +107,7 @@
     <string name="error_empty_text">متنی وارد نشده است</string>
     <string name="error_connection_failed">اتصال ناموفق: %1$s</string>
     <string name="error_vpn_permission">مجوز VPN داده نشد</string>
+    <string name="error_no_usable_xray_node">هیچ نودی برای هسته Xray قابل بارگذاری نیست</string>
 
     <string name="subscription_label">اشتراک</string>
     <string name="local_label">محلی</string>

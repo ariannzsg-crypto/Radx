@@ -7,7 +7,7 @@ val RadxCyanLight = Color(0xFF67E8F9)
 val RadxBlue = Color(0xFF2F80ED)
 val RadxBlueDeep = Color(0xFF1E3A8A)
 
-val RadxBackground = Color(0xFF0B1220)
+val RadxBackground = Color(0xFF070C17)
 val RadxSurface = Color(0xFF121C2D)
 val RadxSurfaceElevated = Color(0xFF18243A)
 val RadxOutline = Color(0xFF23324B)
