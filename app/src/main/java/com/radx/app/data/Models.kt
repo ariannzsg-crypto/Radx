@@ -19,6 +19,10 @@ enum class TunnelMode { VPN, PROXY }
 @Serializable
 enum class AccentColor { CYAN, BLUE, VIOLET, EMERALD }
 
+/** Verbosity of the core log, matching the names sing-box accepts. */
+@Serializable
+enum class LogLevel { ERROR, WARN, INFO, DEBUG }
+
 /**
  * A single proxy outbound, already translated into sing-box outbound JSON so the
  * config builder only has to assemble them.
@@ -71,4 +75,28 @@ data class AppSettings(
     val accent: AccentColor = AccentColor.CYAN,
     /** Bring the tunnel up as soon as the app opens, when a config exists. */
     val autoConnect: Boolean = false,
-)
+    /** Local SOCKS/HTTP port in proxy mode. */
+    val proxyPort: Int = 7890,
+    /** Measure every node's latency as soon as the node list opens. */
+    val autoPing: Boolean = true,
+    /** How long a latency probe waits before it counts as a timeout. */
+    val pingTimeoutMs: Int = 3000,
+    /** Update subscription configs that are older than `SUBSCRIPTION_MAX_AGE_MS`. */
+    val autoRefresh: Boolean = false,
+    /** MTU of the tunnel interface; a smaller value helps on links that drop big packets. */
+    val tunMtu: Int = 9000,
+    /** Dial private addresses (LAN, loopback ranges) directly instead of through the proxy. */
+    val bypassLan: Boolean = true,
+    /** Reject QUIC, so apps retry over TCP when UDP is blocked upstream. */
+    val blockQuic: Boolean = false,
+    /** How much the core writes to the log screen. */
+    val logLevel: LogLevel = LogLevel.INFO,
+) {
+    companion object {
+        /** Age after which an auto-refresh picks a subscription up again. */
+        const val SUBSCRIPTION_MAX_AGE_MS = 12 * 60 * 60 * 1000L
+
+        const val MIN_MTU = 1280
+        const val MAX_MTU = 9000
+    }
+}

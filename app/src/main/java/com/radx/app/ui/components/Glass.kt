@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,10 +18,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,40 +65,108 @@ fun GlassBackdrop(
 ) {
     val glass = LocalGlassEffects.current
     val accent = LocalRadxAccent.current
+    // The glows drift slowly, which is what makes the glass read as glass instead of a
+    // flat tint. Nothing else in the app animates on its own, so this stays cheap.
+    val transition = rememberInfiniteTransition(label = "backdrop")
+    val drift by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(14000, easing = LinearEasing), RepeatMode.Reverse),
+        label = "backdrop_drift",
+    )
+    val sway = if (glass) drift else 0f
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(RadxBackground)
             .drawBehind {
                 if (!glass) return@drawBehind
+                val shift = sway * size.width * 0.06f
                 drawCircle(
                     brush = Brush.radialGradient(
-                        colors = listOf(accent.primary.copy(alpha = 0.16f), Color.Transparent),
-                        center = Offset(size.width * 0.18f, size.height * 0.04f),
+                        colors = listOf(accent.primary.copy(alpha = 0.18f), Color.Transparent),
+                        center = Offset(size.width * 0.18f + shift, size.height * 0.04f),
                         radius = size.width * 0.85f,
                     ),
                     radius = size.width * 0.85f,
-                    center = Offset(size.width * 0.18f, size.height * 0.04f),
+                    center = Offset(size.width * 0.18f + shift, size.height * 0.04f),
                 )
                 drawCircle(
                     brush = Brush.radialGradient(
-                        colors = listOf(accent.secondary.copy(alpha = 0.18f), Color.Transparent),
-                        center = Offset(size.width * 0.95f, size.height * 0.38f),
+                        colors = listOf(accent.secondary.copy(alpha = 0.20f), Color.Transparent),
+                        center = Offset(size.width * 0.95f - shift, size.height * 0.36f + shift * 0.4f),
                         radius = size.width * 0.8f,
                     ),
                     radius = size.width * 0.8f,
-                    center = Offset(size.width * 0.95f, size.height * 0.38f),
+                    center = Offset(size.width * 0.95f - shift, size.height * 0.36f + shift * 0.4f),
                 )
                 drawCircle(
                     brush = Brush.radialGradient(
-                        colors = listOf(accent.glow.copy(alpha = 0.16f), Color.Transparent),
-                        center = Offset(size.width * 0.25f, size.height * 0.92f),
+                        colors = listOf(accent.glow.copy(alpha = 0.18f), Color.Transparent),
+                        center = Offset(size.width * 0.25f + shift * 0.6f, size.height * 0.92f),
                         radius = size.width,
                     ),
                     radius = size.width,
-                    center = Offset(size.width * 0.25f, size.height * 0.92f),
+                    center = Offset(size.width * 0.25f + shift * 0.6f, size.height * 0.92f),
                 )
             },
+        content = content,
+    )
+}
+
+/** A frosted list row: one line of content with the same glass treatment as a card. */
+@Composable
+fun GlassRow(
+    modifier: Modifier = Modifier,
+    shape: Shape = RoundedCornerShape(18.dp),
+    selected: Boolean = false,
+    onClick: (() -> Unit)? = null,
+    content: @Composable RowScope.() -> Unit,
+) {
+    val glass = LocalGlassEffects.current
+    val accent = LocalRadxAccent.current
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(
+                brush = when {
+                    selected && glass -> Brush.linearGradient(
+                        listOf(accent.primary.copy(alpha = 0.18f), accent.secondary.copy(alpha = 0.06f)),
+                    )
+
+                    glass -> Brush.linearGradient(GlassHighlight)
+                    selected -> Brush.linearGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                        ),
+                    )
+
+                    else -> Brush.linearGradient(
+                        listOf(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.surface),
+                    )
+                },
+            )
+            .border(
+                width = 1.dp,
+                brush = if (selected) {
+                    Brush.linearGradient(listOf(accent.primary.copy(alpha = 0.75f), accent.primary.copy(alpha = 0.25f)))
+                } else if (glass) {
+                    Brush.linearGradient(GlassEdge)
+                } else {
+                    Brush.linearGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                        ),
+                    )
+                },
+                shape = shape,
+            )
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
         content = content,
     )
 }

@@ -3,6 +3,7 @@ package com.radx.app.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,9 +17,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,15 +42,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.radx.app.BuildConfig
 import com.radx.app.R
+import com.radx.app.config.SingBoxConfigBuilder
 import com.radx.app.core.XrayRunner
 import com.radx.app.data.AccentColor
 import com.radx.app.data.AppSettings
 import com.radx.app.data.CoreKind
+import com.radx.app.data.LogLevel
 import com.radx.app.data.TunnelMode
 import com.radx.app.ui.UiState
+import com.radx.app.ui.components.GradientTitle
 import com.radx.app.ui.components.RadxCard
 import com.radx.app.ui.components.SectionHeader
 import com.radx.app.ui.theme.LocalRadxAccent
@@ -64,9 +72,11 @@ fun SettingsScreen(
     val xrayReady = remember { XrayRunner.isAvailable(context) }
     var localDns by rememberSaveable { mutableStateOf(state.settings.localDns) }
     var remoteDns by rememberSaveable { mutableStateOf(state.settings.remoteDns) }
+    var proxyPort by rememberSaveable { mutableStateOf(state.settings.proxyPort.toString()) }
 
     LaunchedEffect(state.settings.localDns) { localDns = state.settings.localDns }
     LaunchedEffect(state.settings.remoteDns) { remoteDns = state.settings.remoteDns }
+    LaunchedEffect(state.settings.proxyPort) { proxyPort = state.settings.proxyPort.toString() }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -74,10 +84,7 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
-            Text(
-                text = stringResource(R.string.settings),
-                style = MaterialTheme.typography.headlineMedium,
-            )
+            GradientTitle(text = stringResource(R.string.settings))
         }
 
         item {
@@ -160,6 +167,44 @@ fun SettingsScreen(
                     checked = state.settings.autoConnect,
                     onCheckedChange = { value -> onUpdate { it.copy(autoConnect = value) } },
                 )
+                SwitchRow(
+                    title = stringResource(R.string.settings_auto_refresh),
+                    subtitle = stringResource(R.string.settings_auto_refresh_desc),
+                    checked = state.settings.autoRefresh,
+                    onCheckedChange = { value -> onUpdate { it.copy(autoRefresh = value) } },
+                )
+            }
+        }
+
+        item {
+            RadxCard {
+                SectionHeader(title = stringResource(R.string.settings_nodes))
+                Spacer(Modifier.height(4.dp))
+                SwitchRow(
+                    title = stringResource(R.string.settings_auto_ping),
+                    subtitle = stringResource(R.string.settings_auto_ping_desc),
+                    checked = state.settings.autoPing,
+                    onCheckedChange = { value -> onUpdate { it.copy(autoPing = value) } },
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.settings_ping_timeout),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(
+                        1_000 to R.string.settings_timeout_1s,
+                        3_000 to R.string.settings_timeout_3s,
+                        5_000 to R.string.settings_timeout_5s,
+                    ).forEach { (value, label) ->
+                        FilterChip(
+                            selected = state.settings.pingTimeoutMs == value,
+                            onClick = { onUpdate { it.copy(pingTimeoutMs = value) } },
+                            label = { Text(stringResource(label)) },
+                        )
+                    }
+                }
             }
         }
 
@@ -179,6 +224,100 @@ fun SettingsScreen(
                     checked = state.settings.ipv6,
                     onCheckedChange = { value -> onUpdate { it.copy(ipv6 = value) } },
                 )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = proxyPort,
+                    onValueChange = { text -> proxyPort = text.filter { it.isDigit() }.take(5) },
+                    label = { Text(stringResource(R.string.settings_proxy_port)) },
+                    supportingText = { Text(stringResource(R.string.settings_proxy_port_desc)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    trailingIcon = {
+                        IconButton(
+                            onClick = {
+                                val port = proxyPort.toIntOrNull()?.coerceIn(
+                                    SingBoxConfigBuilder.MIN_PROXY_PORT,
+                                    SingBoxConfigBuilder.MAX_PROXY_PORT,
+                                ) ?: state.settings.proxyPort
+                                proxyPort = port.toString()
+                                onUpdate { it.copy(proxyPort = port) }
+                            },
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Check,
+                                contentDescription = stringResource(R.string.apply),
+                                tint = RadxCyan,
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+
+        item {
+            RadxCard {
+                SectionHeader(title = stringResource(R.string.settings_advanced))
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.settings_mtu),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    text = stringResource(R.string.settings_mtu_desc),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = RadxTextSecondary,
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(
+                        AppSettings.MIN_MTU to R.string.settings_mtu_1280,
+                        1500 to R.string.settings_mtu_1500,
+                        AppSettings.MAX_MTU to R.string.settings_mtu_9000,
+                    ).forEach { (value, label) ->
+                        FilterChip(
+                            selected = state.settings.tunMtu == value,
+                            onClick = { onUpdate { it.copy(tunMtu = value) } },
+                            label = { Text(stringResource(label)) },
+                        )
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                SwitchRow(
+                    title = stringResource(R.string.settings_bypass_lan),
+                    subtitle = stringResource(R.string.settings_bypass_lan_desc),
+                    checked = state.settings.bypassLan,
+                    onCheckedChange = { value -> onUpdate { it.copy(bypassLan = value) } },
+                )
+                SwitchRow(
+                    title = stringResource(R.string.settings_block_quic),
+                    subtitle = stringResource(R.string.settings_block_quic_desc),
+                    checked = state.settings.blockQuic,
+                    onCheckedChange = { value -> onUpdate { it.copy(blockQuic = value) } },
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.settings_log_level),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    listOf(
+                        LogLevel.ERROR to R.string.settings_log_error,
+                        LogLevel.WARN to R.string.settings_log_warn,
+                        LogLevel.INFO to R.string.settings_log_info,
+                        LogLevel.DEBUG to R.string.settings_log_debug,
+                    ).forEach { (level, label) ->
+                        FilterChip(
+                            selected = state.settings.logLevel == level,
+                            onClick = { onUpdate { it.copy(logLevel = level) } },
+                            label = { Text(stringResource(label)) },
+                        )
+                    }
+                }
             }
         }
 

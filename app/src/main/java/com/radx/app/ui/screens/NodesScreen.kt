@@ -53,7 +53,10 @@ import com.radx.app.ui.UiState
 import com.radx.app.ui.sortedByPing
 import com.radx.app.ui.components.DelayLabel
 import com.radx.app.ui.components.EmptyState
+import com.radx.app.ui.components.GlassRow
+import com.radx.app.ui.components.GradientTitle
 import com.radx.app.ui.components.NodeTypeBadge
+import com.radx.app.ui.theme.LocalRadxAccent
 import com.radx.app.ui.theme.RadxCyan
 import com.radx.app.ui.theme.RadxTextSecondary
 
@@ -68,8 +71,8 @@ fun NodesScreen(
     var autoPinged by rememberSaveable { mutableStateOf(false) }
     var sort by rememberSaveable { mutableStateOf(NodeSort.DEFAULT) }
 
-    LaunchedEffect(profile?.id) {
-        if (profile != null && !autoPinged) {
+    LaunchedEffect(profile?.id, state.settings.autoPing) {
+        if (profile != null && !autoPinged && state.settings.autoPing) {
             autoPinged = true
             onPing()
         }
@@ -94,10 +97,7 @@ fun NodesScreen(
         Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.nodes_title),
-                    style = MaterialTheme.typography.headlineMedium,
-                )
+                GradientTitle(text = stringResource(R.string.nodes_title))
                 Text(
                     text = profile?.name ?: stringResource(R.string.no_profiles),
                     style = MaterialTheme.typography.labelSmall,
@@ -204,67 +204,54 @@ private fun NodeRow(
     pinging: Boolean,
     onClick: () -> Unit,
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = if (selected) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
-        } else {
-            MaterialTheme.colorScheme.surface
-        },
-        border = BorderStroke(
-            1.dp,
-            if (selected) RadxCyan.copy(alpha = 0.55f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-        ),
-    ) {
-        Row(
+    GlassRow(selected = selected, onClick = onClick) {
+        Box(
             modifier = Modifier
-                .clickable(onClick = onClick)
-                .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .size(20.dp)
+                .clip(CircleShape)
+                .background(
+                    if (selected) {
+                        LocalRadxAccent.current.primary
+                    } else {
+                        MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
+                    },
+                ),
+            contentAlignment = Alignment.Center,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(20.dp)
-                    .clip(CircleShape)
-                    .background(if (selected) RadxCyan else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (selected) {
-                    Icon(
-                        imageVector = Icons.Rounded.Check,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(13.dp),
-                    )
-                }
+            if (selected) {
+                Icon(
+                    imageVector = Icons.Rounded.Check,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(13.dp),
+                )
             }
+        }
 
-            Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(12.dp))
 
-            Column(Modifier.weight(1f)) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = node.name,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                NodeTypeBadge(node.type)
+                Spacer(Modifier.width(8.dp))
                 Text(
-                    text = node.name,
-                    style = MaterialTheme.typography.titleMedium,
+                    text = node.server,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = RadxTextSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    NodeTypeBadge(node.type)
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = node.server,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = RadxTextSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
             }
-
-            Spacer(Modifier.width(8.dp))
-            DelayLabel(delay = delay, pinging = pinging)
         }
+
+        Spacer(Modifier.width(8.dp))
+        DelayLabel(delay = delay, pinging = pinging)
     }
 }

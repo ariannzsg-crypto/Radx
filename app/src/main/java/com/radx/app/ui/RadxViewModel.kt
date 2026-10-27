@@ -205,7 +205,21 @@ class RadxViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun refreshSubscription(id: String) {
+    /**
+     * Refreshes the subscriptions that have not been updated for a while. Only the
+     * automatic path is silent; a manual refresh still reports what happened.
+     */
+    fun refreshStaleSubscriptions() {
+        val now = System.currentTimeMillis()
+        _state.value.profiles
+            .filter { profile ->
+                profile.isSubscription &&
+                    now - profile.updatedAt > AppSettings.SUBSCRIPTION_MAX_AGE_MS
+            }
+            .forEach { profile -> refreshSubscription(profile.id, silent = true) }
+    }
+
+    fun refreshSubscription(id: String, silent: Boolean = false) {
         val profile = _state.value.profiles.firstOrNull { it.id == id } ?: return
         val url = profile.subscriptionUrl ?: return
         viewModelScope.launch {
@@ -224,7 +238,11 @@ class RadxViewModel(application: Application) : AndroidViewModel(application) {
                     ),
                 )
                 restartIfActive()
-                sendEvent(string(R.string.import_success, result.nodes.size))
+                if (silent) {
+                    sendEvent(string(R.string.subscription_refreshed, profile.name))
+                } else {
+                    sendEvent(string(R.string.import_success, result.nodes.size))
+                }
             } catch (error: Throwable) {
                 sendEvent(importError(error), isError = true)
             } finally {
@@ -283,11 +301,12 @@ class RadxViewModel(application: Application) : AndroidViewModel(application) {
     fun pingAll() {
         val profile = _state.value.selectedProfile ?: return
         if (profile.nodes.isEmpty() || _state.value.pinging) return
+        val timeout = _state.value.settings.pingTimeoutMs
         viewModelScope.launch {
             _state.update { it.copy(pinging = true) }
             val results = withContext(Dispatchers.IO) {
                 profile.nodes.map { node ->
-                    async { node.tag to pingNode(node) }
+                    async { node.tag to pingNode(node, timeout) }
                 }.awaitAll()
             }
             val delays = results.mapNotNull { (tag, delay) -> delay?.let { tag to it } }.toMap()
@@ -344,12 +363,12 @@ class RadxViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun pingNode(node: ProxyNode): Int? {
+    private fun pingNode(node: ProxyNode, timeoutMs: Int): Int? {
         if (node.server.isBlank() || node.port !in 1..65535) return null
         return runCatching {
             val start = System.nanoTime()
             Socket().use { socket ->
-                socket.connect(InetSocketAddress(node.server, node.port), PING_TIMEOUT_MS)
+                socket.connect(InetSocketAddress(node.server, node.port), timeoutMs)
             }
             ((System.nanoTime() - start) / 1_000_000L).toInt()
         }.getOrNull()
@@ -378,7 +397,4 @@ class RadxViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private companion object {
-        const val PING_TIMEOUT_MS = 3000
-    }
 }

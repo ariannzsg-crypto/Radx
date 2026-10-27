@@ -24,9 +24,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.radx.app.R
@@ -45,6 +47,28 @@ fun RadxCard(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     GlassPanel(modifier = modifier, onClick = onClick, content = content)
+}
+
+/**
+ * Screen title painted with the accent gradient.
+ *
+ * Every tab uses it, so the accent chosen in the settings reads consistently across the
+ * whole interface instead of only on the connect orb.
+ */
+@Composable
+fun GradientTitle(
+    text: String,
+    modifier: Modifier = Modifier,
+    style: TextStyle = MaterialTheme.typography.headlineMedium,
+) {
+    val accent = LocalRadxAccent.current
+    Text(
+        text = text,
+        style = style.copy(
+            brush = Brush.linearGradient(listOf(accent.primary, accent.secondary)),
+        ),
+        modifier = modifier,
+    )
 }
 
 @Composable

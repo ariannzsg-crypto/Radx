@@ -176,7 +176,7 @@ class RadxVpnService : VpnService() {
                         mode = settings.tunnelMode,
                         since = System.currentTimeMillis(),
                         proxyPort = if (settings.tunnelMode == TunnelMode.PROXY) {
-                            SingBoxConfigBuilder.PROXY_PORT
+                            settings.proxyPort
                         } else {
                             0
                         },
@@ -301,7 +301,7 @@ class RadxVpnService : VpnService() {
             xrayNodes = if (xrayReady) xrayIndexes.size else 0,
             xrayPorts = if (xrayReady) xrayIndexes.map { XrayBridge.port(it) } else emptyList(),
             proxyPort = if (settings.tunnelMode == TunnelMode.PROXY) {
-                SingBoxConfigBuilder.PROXY_PORT
+                settings.proxyPort
             } else {
                 0
             },

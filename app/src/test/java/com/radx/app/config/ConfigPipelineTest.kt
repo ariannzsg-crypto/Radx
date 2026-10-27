@@ -1,6 +1,7 @@
 package com.radx.app.config
 
 import com.radx.app.data.AppSettings
+import com.radx.app.data.LogLevel
 import com.radx.app.data.Profile
 import com.radx.app.data.ProfileKind
 import com.radx.app.data.TunnelMode
@@ -377,6 +378,41 @@ class ConfigPipelineTest {
         assertThrows(IllegalArgumentException::class.java) {
             SingBoxConfigBuilder.build(profile, AppSettings())
         }
+    }
+
+    @Test
+    fun `advanced settings reach the generated config`() {
+        val nodes = ClashConfigParser.parse(clashYaml).nodes
+        val profile = Profile(id = "p1", name = "Clash", kind = ProfileKind.CLASH, nodes = nodes)
+
+        val config = json.parseToJsonElement(
+            SingBoxConfigBuilder.build(
+                profile,
+                AppSettings(
+                    tunnelMode = TunnelMode.PROXY,
+                    bypassLan = false,
+                    blockQuic = true,
+                    logLevel = LogLevel.DEBUG,
+                ),
+            ),
+        ).jsonObject
+
+        assertEquals("debug", config["log"]!!.jsonObject.string("level"))
+        val rules = config["route"]!!.jsonObject["rules"]!!.jsonArray.map { it.jsonObject }
+        assertTrue(rules.any { it.string("protocol") == "quic" && it.string("action") == "reject" })
+        assertTrue(rules.none { it["ip_is_private"] != null })
+    }
+
+    @Test
+    fun `the tun mtu follows the setting`() {
+        val nodes = ClashConfigParser.parse(clashYaml).nodes
+        val profile = Profile(id = "p1", name = "Clash", kind = ProfileKind.CLASH, nodes = nodes)
+
+        val inbound = json.parseToJsonElement(
+            SingBoxConfigBuilder.build(profile, AppSettings(tunMtu = 1400)),
+        ).jsonObject["inbounds"]!!.jsonArray[0].jsonObject
+
+        assertEquals(1400, inbound["mtu"]!!.jsonPrimitive.int)
     }
 
     @Test

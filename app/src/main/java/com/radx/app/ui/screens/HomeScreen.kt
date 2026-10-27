@@ -50,6 +50,8 @@ import com.radx.app.ui.Formatters
 import com.radx.app.ui.UiState
 import com.radx.app.ui.components.ConnectButton
 import com.radx.app.ui.components.EmptyState
+import com.radx.app.ui.components.GlassPanel
+import com.radx.app.ui.components.GradientTitle
 import com.radx.app.ui.components.NodeTypeBadge
 import com.radx.app.ui.components.ProfileCard
 import com.radx.app.ui.components.RadxCard
@@ -90,7 +92,7 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text(
+                    GradientTitle(
                         text = stringResource(R.string.app_name),
                         style = MaterialTheme.typography.headlineLarge,
                     )
@@ -107,18 +109,19 @@ fun HomeScreen(
         }
 
         item {
-            ConnectButton(
-                connected = state.connected,
-                busy = state.busy,
-                label = stringResource(
-                    if (state.connected || state.busy) R.string.disconnect else R.string.connect,
-                ),
-                onClick = onToggle,
-            )
-        }
-
-        item {
-            StatusSummary(connection = connection, elapsed = elapsed)
+            // The orb and its status read as one hero panel instead of two floating
+            // blocks, which is what gives the home tab its shape.
+            GlassPanel {
+                ConnectButton(
+                    connected = state.connected,
+                    busy = state.busy,
+                    label = stringResource(
+                        if (state.connected || state.busy) R.string.disconnect else R.string.connect,
+                    ),
+                    onClick = onToggle,
+                )
+                StatusSummary(connection = connection, elapsed = elapsed)
+            }
         }
 
         item {

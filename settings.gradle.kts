@@ -22,3 +22,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "Radx"
 include(":app")
+
+// Windows/Linux desktop build: the same config pipeline behind a command line tool.
+include(":desktop")

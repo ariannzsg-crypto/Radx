@@ -28,6 +28,8 @@
 | تب لاگ زنده‌ی هر دو هسته با فیلتر و کپی | ✅ |
 | کارت «ساختار تونل» (رابط، مسیر، DNS، MTU، پل Xray) | ✅ |
 | ترتیب نودها بر اساس پینگ (سریع‌ترین/کندترین/نام) | ✅ |
+| تنظیمات پیشرفته: MTU تونل، عبور شبکه‌ی محلی، مسدود کردن QUIC، سطح لاگ هسته | ✅ |
+| نسخه‌ی ویندوز/لینوکس (ابزار خط فرمان `radx` با همان خط لوله‌ی کانفیگ) | ✅ (`Radx-Windows-vX.Y.Z.zip` در Releases) |
 | ساخت APK و انتشار در GitHub Releases | ✅ (workflow آماده) |
 
 ---
@@ -60,6 +62,10 @@ Radx/
 │       │       └── ui/                  # Theme، ViewModel، Screens، Components
 │       └── libbox/java/com/radx/app/libbox/
 │           └── LibboxEngine.kt          # پل Go↔Kotlin (فقط وقتی AAR هست)
+├── desktop/                            # نسخه‌ی ویندوز/لینوکس (همان خط لوله‌ی کانفیگ)
+│   ├── build.gradle.kts                # source set مشترک: config + data اپ
+│   ├── src/main/kotlin/com/radx/desktop/  # Main (CLI) + DesktopStore + Cores
+│   └── dist/                           # radx.cmd و راهنمای ویندوز در بسته‌ی نهایی
 ├── scripts/
 │   ├── build-libbox.sh                 # ساخت libbox.aar با gomobile
 │   ├── check_sources.js                # بررسی استاتیک منابع/رشته‌ها
@@ -105,6 +111,7 @@ BottomSheet با سه تب: **پیست متن** (لینک‌ها، YAML یا JSO
 - انتخاب هسته: sing-box (فعال) و Clash Meta (در این نسخه همراه نیست).
 - حالت تونل: VPN (TUN) یا پروکسی محلی.
 - شبکه: اجازه LAN، IPv6.
+- پیشرفته: اندازه‌ی MTU تونل (۱۲۸۰/۱۵۰۰/۹۰۰۰)، عبور شبکه‌ی محلی از بیرون تونل، مسدود کردن QUIC و سطح لاگ هسته (خطا/هشدار/اطلاعات/اشکال‌زدایی).
 - DNS محلی/راه دور با دکمه‌ی اعمال.
 - ظاهر: کلید «حالت شیشه‌ای» و انتخاب رنگ تأکیدی.
 - رفتار: اتصال خودکار هنگام باز شدن برنامه.
@@ -299,7 +306,7 @@ interface TunSetup {
 Gradle Wrapper (8.9) در مخزن هست؛ نیازی به نصب Gradle جداگانه نیست (فقط JDK 17 و Android SDK).
 Android Studio: پروژه را باز کنید؛ اگر `libbox.aar` نباشد، فقط UI/ایمپورت کامپایل می‌شود.
 
-وضعیت بررسی‌شده‌ی همین مخزن: `assembleDebug` و `assembleRelease` موفق، و ۱۴ تست واحد خط لوله‌ی کانفیگ (لینک‌ها، YAML، JSON، base64، ساخت کانفیگ نهایی) پاس می‌شوند.
+وضعیت بررسی‌شده‌ی همین مخزن: `assembleDebug` و `assembleRelease` موفق، و ۲۴ تست واحد خط لوله‌ی کانفیگ (لینک‌ها، YAML، JSON، base64، ساخت کانفیگ نهایی و تنظیمات پیشرفته) پاس می‌شوند.
 
 `scripts/check_sources.js` (در CI هم اجرا می‌شود) همه‌ی `R.string.*`ها را با هر دو فایل رشته و رفرنس‌های مانیفست/XML بررسی می‌کند.
 
@@ -308,6 +315,19 @@ Android Studio: پروژه را باز کنید؛ اگر `libbox.aar` نباشد
 android.aapt2FromMavenOverride=C:/path/to/android-sdk/build-tools/35.0.0/aapt2.exe
 ```
 روی لینوکس/CI این مشکل معمولاً پیش نمی‌آید.
+
+### نسخه‌ی ویندوز / لینوکس (ابزار `radx`)
+ماژول `desktop` همان `ProxyLinkParser`/`ConfigImporter`/`SingBoxConfigBuilder`/`XrayConfigBuilder` اپ را کامپایل می‌کند، پس هر دو نسخه یک کانفیگ می‌سازند.
+```bash
+./gradlew :desktop:installDist
+# خروجی: desktop/build/install/radx/  (به همراه پوشه‌ی cores/ و radx.cmd)
+radx import https://example.com/sub --name main
+radx nodes --profile 1
+radx ping --select-fastest
+radx gen --mode proxy --out ./out --cores ./cores --check
+radx up  --mode proxy --cores ./cores            # تا Ctrl+C
+```
+حالت `proxy` روی `127.0.0.1:7890` (SOCKS + HTTP) گوش می‌دهد و نیازی به دسترسی مدیر ندارد؛ حالت `tun` کل سیستم را می‌گیرد و باید در شل Administrator اجرا شود. هسته‌ها با `--cores`، `RADX_CORES`، پوشه‌ی `cores/` کنار ابزار یا `PATH` پیدا می‌شوند و وضعیت در `%USERPROFILE%\.radx` (یا `RADX_HOME`) ذخیره می‌شود. تنظیمات پیشرفته‌ی اپ روی این ابزار با `--mtu`، `--block-quic`، `--no-bypass-lan` و `--log-level` در دسترس‌اند.
 
 ---
 
@@ -342,7 +362,8 @@ workflow `Build and Release APK` اجرا می‌شود و:
 1. `scripts/check_sources.js` را اجرا می‌کند،
 2. `libbox.aar` را با gomobile می‌سازد (با کش بر اساس نسخه sing-box)،
 3. `gradle :app:assembleRelease` را با کلید release اجرا می‌کند،
-4. APK را با نام `Radx-v1.0.0.apk` به Release تگ می‌چسباند و بخش مربوطه‌ی `CHANGELOG.md` را به‌عنوان متن Release می‌گذارد.
+4. APK را با نام `Radx-v1.0.0.apk` به Release تگ می‌چسباند و بخش مربوطه‌ی `CHANGELOG.md` را به‌عنوان متن Release می‌گذارد،
+5. در کار `windows` بسته‌ی `Radx-Windows-v1.0.0.zip` (شامل `radx.cmd`، هسته‌های ویندوز و `wintun.dll`) ساخته، با یک تست دودوی واقعی بررسی و به همان Release آپلود می‌شود.
 
 اجرای دستی بدون تگ: از تب Actions → `Build and Release APK` → Run workflow (نسخه اختیاری). در این حالت فقط Artifact ساخته می‌شود و Release ایجاد نمی‌شود.
 
@@ -350,7 +371,7 @@ workflow `Build and Release APK` اجرا می‌شود و:
 
 ---
 
-## محدودیت‌های نسخه ۱.۲.۱
+## محدودیت‌های نسخه ۱.۳.۰
 
 - **قواعد مسیریابی Clash/sing-box ایمپورت نمی‌شوند**؛ همه نودها در یک selector و همه ترافیک از `proxy` می‌رود (LAN مستقیم است). ایمپورت `rules`/`proxy-groups` در نقشه راه است.
 - **هسته Clash Meta همراه نیست**؛ فقط sing-box. گزینه‌ی Clash در تنظیمات نمایش داده می‌شود اما غیرفعال است.

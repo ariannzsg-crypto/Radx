@@ -40,7 +40,7 @@ import com.radx.app.R
 import com.radx.app.core.CoreLog
 import com.radx.app.core.LogEntry
 import com.radx.app.core.LogSource
-import com.radx.app.ui.components.SectionHeader
+import com.radx.app.ui.components.GradientTitle
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -78,8 +78,8 @@ fun LogsScreen(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            SectionHeader(
-                title = stringResource(R.string.logs_title),
+            GradientTitle(
+                text = stringResource(R.string.logs_title),
                 modifier = Modifier.weight(1f),
             )
             IconButton(onClick = { follow = !follow }) {

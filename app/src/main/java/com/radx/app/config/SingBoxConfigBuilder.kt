@@ -29,9 +29,13 @@ import kotlinx.serialization.json.put
  */
 object SingBoxConfigBuilder {
 
+    /** Default local proxy port; the user can change it in the settings. */
     const val PROXY_PORT = 7890
     const val SELECTOR_TAG = "proxy"
     const val DIRECT_TAG = "direct"
+
+    const val MIN_PROXY_PORT = 1024
+    const val MAX_PROXY_PORT = 65535
 
     private const val TUN_IPV4 = "172.19.0.1/30"
     private const val TUN_IPV6 = "fdfe:dcba:9876::1/126"
@@ -57,7 +61,7 @@ object SingBoxConfigBuilder {
             put(
                 "log",
                 buildJsonObject {
-                    put("level", "info")
+                    put("level", settings.logLevel.name.lowercase())
                     put("timestamp", true)
                 },
             )
@@ -100,12 +104,25 @@ object SingBoxConfigBuilder {
                                     put("action", "hijack-dns")
                                 },
                             )
-                            add(
-                                buildJsonObject {
-                                    put("ip_is_private", true)
-                                    put("outbound", DIRECT_TAG)
-                                },
-                            )
+                            if (settings.blockQuic) {
+                                // QUIC is the first thing to break on a filtered link, and a
+                                // blocked UDP flow stalls for seconds before the app retries
+                                // over TCP; rejecting it here makes that switch immediate.
+                                add(
+                                    buildJsonObject {
+                                        put("protocol", "quic")
+                                        put("action", "reject")
+                                    },
+                                )
+                            }
+                            if (settings.bypassLan) {
+                                add(
+                                    buildJsonObject {
+                                        put("ip_is_private", true)
+                                        put("outbound", DIRECT_TAG)
+                                    },
+                                )
+                            }
                         },
                     )
                     put("final", SELECTOR_TAG)
@@ -249,7 +266,7 @@ object SingBoxConfigBuilder {
                         if (settings.ipv6) add(TUN_IPV6)
                     },
                 )
-                put("mtu", 9000)
+                put("mtu", settings.tunMtu.coerceIn(AppSettings.MIN_MTU, AppSettings.MAX_MTU))
                 put("auto_route", true)
                 put("strict_route", false)
                 put("stack", "gvisor")
@@ -259,7 +276,7 @@ object SingBoxConfigBuilder {
                 put("type", "mixed")
                 put("tag", "mixed-in")
                 put("listen", if (settings.allowLan) "0.0.0.0" else "127.0.0.1")
-                put("listen_port", PROXY_PORT)
+                put("listen_port", settings.proxyPort.coerceIn(MIN_PROXY_PORT, MAX_PROXY_PORT))
             }
         }
 
