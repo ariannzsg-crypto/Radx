@@ -2,6 +2,7 @@ package com.radx.app.core
 
 import android.content.Context
 import android.util.Log
+import com.radx.app.config.XrayConfigBuilder
 import java.io.File
 import java.net.InetSocketAddress
 import java.net.Socket
@@ -25,6 +26,15 @@ object XrayRunner {
     private const val BINARY_NAME = "libxray.so"
 
     class Session(val process: Process, val directory: File)
+
+    /**
+     * Raised when the core exits before it can serve. [rejectedOutboundIndex] is the
+     * bridge node the core named while loading the config, if it failed that way.
+     */
+    class CoreStartException(
+        message: String,
+        val rejectedOutboundIndex: Int?,
+    ) : IllegalStateException(message)
 
     fun binary(context: Context): File = File(context.applicationInfo.nativeLibraryDir, BINARY_NAME)
 
@@ -86,9 +96,9 @@ object XrayRunner {
 
         if (!process.isAlive) {
             stop(session)
-            val reason = "The Xray core exited: ${logTail(directory)}"
+            val reason = "The Xray core exited: ${failureSummary(directory)}"
             CoreLog.add(LogSource.XRAY, reason)
-            throw IllegalStateException(reason)
+            throw CoreStartException(reason, rejectedIndex(directory))
         }
         // A slow device may answer later than the probe window; sing-box retries the
         // SOCKS dial per connection, so letting the session live is the right call.
@@ -112,6 +122,26 @@ object XrayRunner {
             .joinToString(" | ")
             .take(400)
     }.getOrDefault("")
+
+    /**
+     * The failure line carries the node tags at its start and the innermost cause at its
+     * end, so a long line keeps both ends instead of being cut in the middle.
+     */
+    private fun failureSummary(directory: File, maxChars: Int = 520): String = runCatching {
+        val lines = File(directory, "xray.log").readLines().filter { it.isNotBlank() }
+        val failure = lines.lastOrNull { it.contains("Failed to start") }
+            ?: lines.takeLast(4).joinToString(" | ")
+        if (failure.length <= maxChars) {
+            failure
+        } else {
+            failure.take(maxChars / 2) + " … " + failure.takeLast(maxChars / 2)
+        }
+    }.getOrDefault("")
+
+    /** The bridge node index the core refused, read from the whole on-disk log. */
+    private fun rejectedIndex(directory: File): Int? = runCatching {
+        XrayConfigBuilder.rejectedOutboundIndex(File(directory, "xray.log").readText())
+    }.getOrNull()
 
     private fun canConnect(port: Int): Boolean = runCatching {
         Socket().use { socket ->

@@ -15,6 +15,10 @@ enum class CoreKind { SING_BOX, CLASH_META }
 @Serializable
 enum class TunnelMode { VPN, PROXY }
 
+/** Highlight colour of the interface. */
+@Serializable
+enum class AccentColor { CYAN, BLUE, VIOLET, EMERALD }
+
 /**
  * A single proxy outbound, already translated into sing-box outbound JSON so the
  * config builder only has to assemble them.
@@ -62,4 +66,9 @@ data class AppSettings(
     val localDns: String = "223.5.5.5",
     val remoteDns: String = "https://1.1.1.1/dns-query",
     val showNotification: Boolean = true,
+    /** Frosted, translucent surfaces instead of flat cards. */
+    val glassEffects: Boolean = true,
+    val accent: AccentColor = AccentColor.CYAN,
+    /** Bring the tunnel up as soon as the app opens, when a config exists. */
+    val autoConnect: Boolean = false,
 )

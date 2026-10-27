@@ -128,27 +128,28 @@ class RadxVpnService : VpnService() {
             try {
                 // Nodes whose transport only Xray understands run there, and sing-box
                 // reaches them through their local SOCKS port.
-                val xrayConfig = XrayConfigBuilder.build(profile.nodes)
+                val xraySkip = xrayUnusableNodes(profile)
+                val bridged = profile.nodes.withIndex().count { it.value.viaXray && it.index !in xraySkip }
                 var xrayReady = false
-                if (xrayConfig != null) {
+                if (bridged > 0) {
                     if (XrayRunner.isAvailable(this@RadxVpnService)) {
-                        val firstXrayIndex = profile.nodes.indexOfFirst { it.viaXray }
-                        xraySession = XrayRunner.start(
-                            this@RadxVpnService,
-                            xrayConfig,
-                            XrayBridge.port(firstXrayIndex.coerceAtLeast(0)),
-                        )
+                        xraySession = startXrayCore(profile, xraySkip)
                         xrayReady = true
                     } else {
                         Log.w(TAG, "xray core is not part of this build")
                         CoreLog.add(
                             LogSource.XRAY,
-                            "core missing from this build: ${profile.nodes.count { it.viaXray }} node(s) skipped",
+                            "core missing from this build: $bridged node(s) skipped",
                         )
                     }
                 }
 
-                val config = SingBoxConfigBuilder.build(profile, settings, xrayAvailable = xrayReady)
+                val config = SingBoxConfigBuilder.build(
+                    profile,
+                    settings,
+                    xrayAvailable = xrayReady,
+                    xraySkip = xraySkip,
+                )
                 val implementation = CoreProvider.create()
                     ?: throw IllegalStateException(getString(R.string.error_no_core))
 
@@ -163,9 +164,10 @@ class RadxVpnService : VpnService() {
                 )
                 engine = implementation
 
-                publishTunnelInfo(profile, settings, xrayReady)
+                publishTunnelInfo(profile, settings, xrayReady, xraySkip)
 
-                val nodeName = SingBoxConfigBuilder.activeNode(profile, xrayReady)?.name ?: profile.name
+                val nodeName =
+                    SingBoxConfigBuilder.activeNode(profile, xrayReady, xraySkip)?.name ?: profile.name
                 TunnelStatus.update(
                     ConnectionState.Connected(
                         profileId = profile.id,
@@ -196,6 +198,48 @@ class RadxVpnService : VpnService() {
                 fail(error.message ?: error.javaClass.simpleName)
             }
         }
+    }
+
+    /**
+     * Starts the Xray core, dropping any node it refuses to load.
+     *
+     * The pinned core aborts the entire config when one outbound is invalid, and it names
+     * that outbound in the error, so the failing node is removed and the core retried
+     * instead of losing the whole profile.
+     */
+    private suspend fun startXrayCore(profile: Profile, skip: MutableSet<Int>): XrayRunner.Session {
+        val firstXrayIndex = profile.nodes.indexOfFirst { it.viaXray }
+        while (true) {
+            val config = XrayConfigBuilder.build(profile.nodes, skip)
+                ?: throw IllegalStateException(getString(R.string.error_no_usable_xray_node))
+            try {
+                return XrayRunner.start(
+                    this,
+                    config,
+                    XrayBridge.port(firstXrayIndex.coerceAtLeast(0)),
+                )
+            } catch (error: XrayRunner.CoreStartException) {
+                val index = error.rejectedOutboundIndex
+                if (index == null || !skip.add(index)) throw error
+                val name = profile.nodes.getOrNull(index)?.name ?: "#${index + 1}"
+                CoreLog.add(LogSource.XRAY, "$name was refused by the core and is skipped")
+            }
+        }
+    }
+
+    /**
+     * Nodes the pinned core cannot load at all, so both cores leave them out from the
+     * start rather than letting one bad outbound break the whole tunnel.
+     */
+    private fun xrayUnusableNodes(profile: Profile): MutableSet<Int> {
+        val skip = linkedSetOf<Int>()
+        profile.nodes.withIndex().forEach { (index, node) ->
+            if (!node.viaXray) return@forEach
+            val reason = XrayConfigBuilder.rejectionReason(node) ?: return@forEach
+            skip += index
+            CoreLog.add(LogSource.XRAY, "${node.name} skipped: $reason")
+        }
+        return skip
     }
 
     private fun stopTunnel() {
@@ -230,9 +274,16 @@ class RadxVpnService : VpnService() {
      * scope and the Xray bridge. Shown in the app and in the log, which makes a failing
      * setup readable without a debug build.
      */
-    private fun publishTunnelInfo(profile: Profile, settings: AppSettings, xrayReady: Boolean) {
+    private fun publishTunnelInfo(
+        profile: Profile,
+        settings: AppSettings,
+        xrayReady: Boolean,
+        xraySkip: Set<Int>,
+    ) {
         val spec = lastTunSpec
-        val xrayIndexes = profile.nodes.withIndex().filter { it.value.viaXray }.map { it.index }
+        val xrayIndexes = profile.nodes.withIndex()
+            .filter { it.value.viaXray && it.index !in xraySkip }
+            .map { it.index }
         val info = TunnelInfo(
             mode = settings.tunnelMode,
             core = runCatching { engine?.version }.getOrNull()?.takeIf { it.isNotBlank() }

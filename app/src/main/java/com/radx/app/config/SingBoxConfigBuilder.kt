@@ -41,10 +41,15 @@ object SingBoxConfigBuilder {
         encodeDefaults = true
     }
 
-    fun build(profile: Profile, settings: AppSettings, xrayAvailable: Boolean = true): String {
+    fun build(
+        profile: Profile,
+        settings: AppSettings,
+        xrayAvailable: Boolean = true,
+        xraySkip: Set<Int> = emptySet(),
+    ): String {
         require(profile.nodes.isNotEmpty()) { "This profile has no nodes" }
 
-        val nodes = usableNodes(profile, xrayAvailable)
+        val nodes = usableNodes(profile, xrayAvailable, xraySkip)
         require(nodes.isNotEmpty()) { "Every node of this profile needs the Xray core" }
         val activeTag = nodes[activeIndex(profile, nodes)].tag
 
@@ -112,27 +117,32 @@ object SingBoxConfigBuilder {
     }
 
     /** The tag of the currently selected node, after collision-free tagging. */
-    fun activeTag(profile: Profile, xrayAvailable: Boolean = true): String? {
+    fun activeTag(profile: Profile, xrayAvailable: Boolean = true, xraySkip: Set<Int> = emptySet()): String? {
         if (profile.nodes.isEmpty()) return null
-        val nodes = usableNodes(profile, xrayAvailable)
+        val nodes = usableNodes(profile, xrayAvailable, xraySkip)
         if (nodes.isEmpty()) return null
         return nodes[activeIndex(profile, nodes)].tag
     }
 
     /** The node the tunnel will actually use, which may differ if Xray is missing. */
-    fun activeNode(profile: Profile, xrayAvailable: Boolean = true): ProxyNode? {
-        val tag = activeTag(profile, xrayAvailable) ?: return null
-        return usableNodes(profile, xrayAvailable).firstOrNull { it.tag == tag }
+    fun activeNode(profile: Profile, xrayAvailable: Boolean = true, xraySkip: Set<Int> = emptySet()): ProxyNode? {
+        val tag = activeTag(profile, xrayAvailable, xraySkip) ?: return null
+        return usableNodes(profile, xrayAvailable, xraySkip).firstOrNull { it.tag == tag }
     }
 
     /**
      * The nodes this build can run. Nodes that need the Xray core are dropped when it
-     * is missing, and otherwise point at the local Xray SOCKS port that serves them.
+     * is missing or cannot load them, and otherwise point at the local Xray SOCKS port
+     * that serves them; that port stays tied to the node's position in the profile.
      */
-    private fun usableNodes(profile: Profile, xrayAvailable: Boolean): List<ProxyNode> =
+    private fun usableNodes(
+        profile: Profile,
+        xrayAvailable: Boolean,
+        xraySkip: Set<Int>,
+    ): List<ProxyNode> =
         assignTags(profile.nodes)
             .withIndex()
-            .filter { (_, node) -> !node.viaXray || xrayAvailable }
+            .filter { (index, node) -> !node.viaXray || (xrayAvailable && index !in xraySkip) }
             .map { (index, node) ->
                 if (node.viaXray) {
                     node.copy(outbound = bridgeOutbound(node.tag, XrayBridge.port(index)))
