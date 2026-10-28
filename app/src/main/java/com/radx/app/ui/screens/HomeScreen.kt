@@ -12,8 +12,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDownward
@@ -48,6 +56,7 @@ import com.radx.app.data.Profile
 import com.radx.app.data.TunnelMode
 import com.radx.app.ui.Formatters
 import com.radx.app.ui.UiState
+import com.radx.app.ui.components.Appear
 import com.radx.app.ui.components.ConnectButton
 import com.radx.app.ui.components.EmptyState
 import com.radx.app.ui.components.GlassPanel
@@ -76,6 +85,7 @@ fun HomeScreen(
     onDeleteProfile: (Profile) -> Unit,
     onCopyProfile: (Profile) -> Unit,
     onShareProfile: (Profile) -> Unit,
+    onShowQr: (Profile) -> Unit,
 ) {
     val connection = state.connection
     val connectedSince = (connection as? ConnectionState.Connected)?.since ?: 0L
@@ -185,21 +195,24 @@ fun HomeScreen(
                 )
             }
         } else {
-            items(state.profiles, key = { it.id }) { profile ->
-                ProfileCard(
-                    profile = profile,
-                    selected = profile.id == state.selectedProfile?.id,
-                    busy = state.busyProfileId == profile.id,
-                    onSelect = { onSelectProfile(profile.id) },
-                    onUpdate = if (profile.isSubscription) {
-                        { onUpdateProfile(profile) }
-                    } else {
-                        null
-                    },
-                    onDelete = { onDeleteProfile(profile) },
-                    onCopy = { onCopyProfile(profile) },
-                    onShare = { onShareProfile(profile) },
-                )
+            itemsIndexed(state.profiles, key = { _, profile -> profile.id }) { index, profile ->
+                Appear(index = index, modifier = Modifier.animateItem()) {
+                    ProfileCard(
+                        profile = profile,
+                        selected = profile.id == state.selectedProfile?.id,
+                        busy = state.busyProfileId == profile.id,
+                        onSelect = { onSelectProfile(profile.id) },
+                        onUpdate = if (profile.isSubscription) {
+                            { onUpdateProfile(profile) }
+                        } else {
+                            null
+                        },
+                        onDelete = { onDeleteProfile(profile) },
+                        onCopy = { onCopyProfile(profile) },
+                        onShare = { onShareProfile(profile) },
+                        onShowQr = { onShowQr(profile) },
+                    )
+                }
             }
         }
 
@@ -231,15 +244,33 @@ private fun StatusSummary(connection: ConnectionState, elapsed: String) {
         else -> stringResource(R.string.not_protected)
     }
 
+    // The status is the most-read line on the screen, so it morphs instead of
+    // swapping abruptly on every connect/disconnect.
+    val animatedColor by animateColorAsState(color, tween(320), label = "statusColor")
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.headlineMedium,
-            color = color,
-        )
+        AnimatedContent(
+            targetState = label,
+            transitionSpec = {
+                (
+                    fadeIn(tween(240)) +
+                        scaleIn(tween(240), initialScale = 0.94f)
+                    ).togetherWith(
+                    fadeOut(tween(140)) +
+                        scaleOut(tween(140), targetScale = 1.02f),
+                )
+            },
+            label = "status",
+        ) { text ->
+            Text(
+                text = text,
+                style = MaterialTheme.typography.headlineMedium,
+                color = animatedColor,
+            )
+        }
         Spacer(Modifier.height(4.dp))
         Text(
             text = subtitle,

@@ -126,7 +126,16 @@ object SingBoxConfigBuilder {
                         },
                     )
                     put("final", SELECTOR_TAG)
-                    put("auto_detect_interface", true)
+                    // Only VPN mode routes the device into our own tun, so only there does
+                    // the core have to bind its outbound sockets to the default interface
+                    // (Android's libbox does that through VpnService.protect). Proxy mode
+                    // has no tun to loop back into, and binding there is actively harmful:
+                    // when another VPN or adapter holds the default route, the detected
+                    // "default" interface is that adapter, every upstream dial goes into it
+                    // and times out, so the node shows a healthy ping while no traffic moves.
+                    if (settings.tunnelMode == TunnelMode.VPN) {
+                        put("auto_detect_interface", true)
+                    }
                 },
             )
         }

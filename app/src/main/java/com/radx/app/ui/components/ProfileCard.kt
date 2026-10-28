@@ -51,6 +51,7 @@ fun ProfileCard(
     onDelete: () -> Unit,
     onCopy: () -> Unit,
     onShare: () -> Unit,
+    onShowQr: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
@@ -169,6 +170,13 @@ fun ProfileCard(
                             },
                         )
                     }
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.qr_show)) },
+                        onClick = {
+                            menuOpen = false
+                            onShowQr()
+                        },
+                    )
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.copy_config)) },
                         onClick = {

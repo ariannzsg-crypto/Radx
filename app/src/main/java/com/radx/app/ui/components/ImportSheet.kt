@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,6 +35,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import com.radx.app.R
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,6 +57,16 @@ fun ImportSheet(
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) onImportFile(uri)
     }
+
+    // A scanned code is the same input as pasted text, so it takes the same path.
+    val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
+        val contents = result.contents
+        if (!contents.isNullOrBlank()) {
+            onImportText(contents, name.ifBlank { null })
+            onDismiss()
+        }
+    }
+    val scanPrompt = stringResource(R.string.qr_scan_hint)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -129,6 +143,30 @@ fun ImportSheet(
                     Spacer(Modifier.padding(4.dp))
                     Text(stringResource(R.string.import_tab_file))
                 }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            OutlinedButton(
+                onClick = {
+                    scanner.launch(
+                        ScanOptions()
+                            .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                            .setPrompt(scanPrompt)
+                            .setBeepEnabled(false)
+                            .setOrientationLocked(false),
+                    )
+                },
+                enabled = !importing,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.QrCodeScanner,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.qr_scan_open))
             }
 
             Spacer(Modifier.height(18.dp))

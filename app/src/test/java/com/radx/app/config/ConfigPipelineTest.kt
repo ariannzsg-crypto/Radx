@@ -373,6 +373,25 @@ class ConfigPipelineTest {
     }
 
     @Test
+    fun `only vpn mode binds outbound sockets to the default interface`() {
+        val nodes = ClashConfigParser.parse(clashYaml).nodes
+        val profile = Profile(id = "p1", name = "Clash", kind = ProfileKind.CLASH, nodes = nodes)
+
+        fun routeFor(mode: TunnelMode) =
+            json.parseToJsonElement(SingBoxConfigBuilder.build(profile, AppSettings(tunnelMode = mode)))
+                .jsonObject["route"]!!.jsonObject
+
+        // VPN mode dials out of the same process whose tun carries the device, so the
+        // core must bind to the real interface to avoid routing its own traffic back.
+        assertEquals(true, routeFor(TunnelMode.VPN).bool("auto_detect_interface"))
+
+        // Proxy mode has no tun, and binding to whatever adapter holds the default
+        // route is what made nodes time out (healthy ping, zero traffic) behind
+        // another VPN, so the key must not be written at all.
+        assertNull(routeFor(TunnelMode.PROXY)["auto_detect_interface"])
+    }
+
+    @Test
     fun `builder rejects an empty profile`() {
         val profile = Profile(id = "empty", name = "Empty", kind = ProfileKind.LINKS)
         assertThrows(IllegalArgumentException::class.java) {

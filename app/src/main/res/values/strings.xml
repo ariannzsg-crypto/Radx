@@ -60,6 +60,13 @@
     <string name="no_nodes">نودی موجود نیست</string>
     <string name="node_delay_ms">%1$d میلی‌ثانیه</string>
     <string name="node_delay_timeout">بی‌پاسخ</string>
+    <string name="node_traffic_mbps">%1$d مگابیت</string>
+    <string name="node_traffic_none">بدون ترافیک</string>
+    <string name="qr_show">نمایش QR</string>
+    <string name="qr_title">کد QR کانفیگ</string>
+    <string name="qr_too_large">این کانفیگ برای QR بزرگ است؛ از «کپی» یا «اشتراک» استفاده کنید.</string>
+    <string name="qr_scan_hint">کد QR کانفیگ یا لینک اشتراک را داخل کادر بگیرید</string>
+    <string name="qr_scan_open">اسکن QR</string>
     <string name="nodes_count">%1$d نود</string>
 
     <string name="settings">تنظیمات</string>

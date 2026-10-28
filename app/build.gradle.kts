@@ -21,8 +21,8 @@ android {
         applicationId = "com.radx.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 8
-        versionName = "1.3.0"
+        versionCode = 9
+        versionName = "1.3.1"
         vectorDrawables.useSupportLibrary = true
 
         // The bundled Xray core only ships for 64-bit architectures, so a 32-bit ABI
@@ -125,12 +125,15 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.compose.animation)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
 
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
     implementation(libs.snakeyaml)
+    implementation(libs.zxing.core)
+    implementation(libs.zxing.embedded)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 

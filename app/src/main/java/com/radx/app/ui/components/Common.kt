@@ -32,6 +32,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.radx.app.R
+import com.radx.app.net.TrafficProbe
 import com.radx.app.ui.Formatters
 import com.radx.app.ui.theme.LocalRadxAccent
 import com.radx.app.ui.theme.RadxCyan
@@ -39,6 +40,7 @@ import com.radx.app.ui.theme.RadxError
 import com.radx.app.ui.theme.RadxSuccess
 import com.radx.app.ui.theme.RadxTextSecondary
 import com.radx.app.ui.theme.RadxWarning
+import kotlin.math.roundToInt
 
 @Composable
 fun RadxCard(
@@ -220,6 +222,37 @@ fun DelayLabel(delay: Int?, pinging: Boolean) {
                 delay <= 600 -> RadxWarning
                 else -> RadxError
             },
+        )
+    }
+}
+
+/**
+ * Result of the real-traffic check, shown in place of the latency.
+ *
+ * A node whose handshake is answered but which carries nothing gets the same red
+ * treatment as a timeout, so it can no longer look healthy.
+ */
+@Composable
+fun TrafficLabel(result: TrafficProbe.Result?, checking: Boolean) {
+    when {
+        checking -> CircularProgressIndicator(
+            modifier = Modifier.size(14.dp),
+            strokeWidth = 2.dp,
+            color = LocalRadxAccent.current.primary,
+        )
+
+        result == null -> Unit
+
+        result.healthy -> Text(
+            text = stringResource(R.string.node_traffic_mbps, result.mbps.roundToInt()),
+            style = MaterialTheme.typography.labelSmall,
+            color = RadxSuccess,
+        )
+
+        else -> Text(
+            text = stringResource(R.string.node_traffic_none),
+            style = MaterialTheme.typography.labelSmall,
+            color = RadxError,
         )
     }
 }

@@ -18,8 +18,10 @@ import com.radx.app.data.AppSettings
 import com.radx.app.data.Profile
 import com.radx.app.data.ProxyNode
 import com.radx.app.data.TunnelMode
+import com.radx.app.net.TrafficProbe
 import com.radx.app.service.RadxVpnService
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
@@ -38,6 +40,9 @@ import java.util.UUID
 
 data class UiEvent(val message: String, val isError: Boolean = false)
 
+/** A dead node must fail within this window, not hang the check forever. */
+private const val TRAFFIC_TIMEOUT_MS = 12_000
+
 data class UiState(
     val profiles: List<Profile> = emptyList(),
     val selectedProfileId: String? = null,
@@ -48,6 +53,13 @@ data class UiState(
     val traffic: TrafficMonitor.Snapshot = TrafficMonitor.Snapshot(),
     val delays: Map<String, Int?> = emptyMap(),
     val pinging: Boolean = false,
+    /**
+     * Real-traffic result per node name, for every node the user has connected
+     * through. A node without an entry has not been verified, which is not the same
+     * as healthy.
+     */
+    val trafficResults: Map<String, TrafficProbe.Result> = emptyMap(),
+    val trafficCheckingNode: String? = null,
     val importing: Boolean = false,
     val busyProfileId: String? = null,
     val coreBundled: Boolean = CoreProvider.isBundled,
@@ -72,6 +84,7 @@ class RadxViewModel(application: Application) : AndroidViewModel(application) {
     private val store = RadxApplication.store
     private val importer = ConfigImporter()
     private val trafficMonitor = TrafficMonitor()
+    private var trafficJob: Job? = null
 
     private val _state = MutableStateFlow(
         UiState(
@@ -92,7 +105,9 @@ class RadxViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch {
             store.selectedProfileId.collect { id ->
-                _state.update { it.copy(selectedProfileId = id) }
+                // Results belong to the nodes of one profile; switching profiles
+                // must not show a stale verdict for a same-named node.
+                _state.update { it.copy(selectedProfileId = id, trafficResults = emptyMap()) }
             }
         }
         viewModelScope.launch {
@@ -104,8 +119,14 @@ class RadxViewModel(application: Application) : AndroidViewModel(application) {
             TunnelStatus.state.collect { connection ->
                 val wasConnected = _state.value.connection is ConnectionState.Connected
                 _state.update { it.copy(connection = connection) }
-                if (connection is ConnectionState.Connected && !wasConnected) {
-                    trafficMonitor.reset()
+                if (connection is ConnectionState.Connected) {
+                    if (!wasConnected) {
+                        trafficMonitor.reset()
+                        verifyTraffic(connection)
+                    }
+                } else {
+                    trafficJob?.cancel()
+                    _state.update { it.copy(trafficCheckingNode = null) }
                 }
                 if (connection is ConnectionState.Failed) {
                     sendEvent(connection.message, isError = true)
@@ -312,6 +333,37 @@ class RadxViewModel(application: Application) : AndroidViewModel(application) {
             val delays = results.mapNotNull { (tag, delay) -> delay?.let { tag to it } }.toMap()
             _state.update { current ->
                 current.copy(delays = current.delays + delays, pinging = false)
+            }
+        }
+    }
+
+    // --------------------------------------------------------------- traffic
+
+    /**
+     * Downloads through the live tunnel once it is up.
+     *
+     * A node can answer a handshake and still carry nothing, so the app verifies with
+     * real traffic and shows the number (or its absence) instead of a green latency.
+     * In VPN mode the app's own sockets already leave through the tunnel; in proxy mode
+     * the request is sent to the local proxy port.
+     */
+    private fun verifyTraffic(connection: ConnectionState.Connected) {
+        trafficJob?.cancel()
+        trafficJob = viewModelScope.launch {
+            _state.update { it.copy(trafficCheckingNode = connection.nodeName) }
+            val port = if (connection.mode == TunnelMode.PROXY) connection.proxyPort else null
+            val result = withContext(Dispatchers.IO) {
+                TrafficProbe.measure(
+                    proxyPort = port,
+                    url = TrafficProbe.mobileUrl,
+                    timeoutMs = TRAFFIC_TIMEOUT_MS,
+                )
+            }
+            _state.update {
+                it.copy(
+                    trafficCheckingNode = null,
+                    trafficResults = it.trafficResults + (connection.nodeName to result),
+                )
             }
         }
     }

@@ -51,11 +51,13 @@ import com.radx.app.data.ProxyNode
 import com.radx.app.ui.NodeSort
 import com.radx.app.ui.UiState
 import com.radx.app.ui.sortedByPing
+import com.radx.app.net.TrafficProbe
 import com.radx.app.ui.components.DelayLabel
 import com.radx.app.ui.components.EmptyState
 import com.radx.app.ui.components.GlassRow
 import com.radx.app.ui.components.GradientTitle
 import com.radx.app.ui.components.NodeTypeBadge
+import com.radx.app.ui.components.TrafficLabel
 import com.radx.app.ui.theme.LocalRadxAccent
 import com.radx.app.ui.theme.RadxCyan
 import com.radx.app.ui.theme.RadxTextSecondary
@@ -185,9 +187,14 @@ fun NodesScreen(
                 items(nodes, key = { it.tag }) { node ->
                     NodeRow(
                         node = node,
+                        modifier = Modifier.animateItem(),
                         selected = node.tag == profile.selectedTag,
                         delay = state.delays[node.tag],
                         pinging = state.pinging && state.delays[node.tag] == null,
+                        // Only a node the app has actually pushed data through gets a
+                        // verdict; the rest keep the handshake measurement.
+                        traffic = state.trafficResults[node.name],
+                        trafficChecking = state.trafficCheckingNode == node.name,
                         onClick = { onSelect(node.tag) },
                     )
                 }
@@ -199,12 +206,15 @@ fun NodesScreen(
 @Composable
 private fun NodeRow(
     node: ProxyNode,
+    modifier: Modifier = Modifier,
     selected: Boolean,
     delay: Int?,
     pinging: Boolean,
+    traffic: TrafficProbe.Result?,
+    trafficChecking: Boolean,
     onClick: () -> Unit,
 ) {
-    GlassRow(selected = selected, onClick = onClick) {
+    GlassRow(modifier = modifier, selected = selected, onClick = onClick) {
         Box(
             modifier = Modifier
                 .size(20.dp)
@@ -252,6 +262,11 @@ private fun NodeRow(
         }
 
         Spacer(Modifier.width(8.dp))
-        DelayLabel(delay = delay, pinging = pinging)
+        // For the node that is actually up, a real transfer outranks the handshake probe.
+        if (trafficChecking || traffic != null) {
+            TrafficLabel(result = traffic, checking = trafficChecking)
+        } else {
+            DelayLabel(delay = delay, pinging = pinging)
+        }
     }
 }

@@ -15,6 +15,7 @@ sourceSets {
         kotlin.srcDirs(
             "../app/src/main/java/com/radx/app/config",
             "../app/src/main/java/com/radx/app/data",
+            "../app/src/main/java/com/radx/app/net",
         )
         // DataStore is Android-only; the desktop tool keeps its state in a JSON file.
         kotlin.exclude("**/RadxStore.kt")

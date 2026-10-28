@@ -306,7 +306,7 @@ interface TunSetup {
 Gradle Wrapper (8.9) در مخزن هست؛ نیازی به نصب Gradle جداگانه نیست (فقط JDK 17 و Android SDK).
 Android Studio: پروژه را باز کنید؛ اگر `libbox.aar` نباشد، فقط UI/ایمپورت کامپایل می‌شود.
 
-وضعیت بررسی‌شده‌ی همین مخزن: `assembleDebug` و `assembleRelease` موفق، و ۲۴ تست واحد خط لوله‌ی کانفیگ (لینک‌ها، YAML، JSON، base64، ساخت کانفیگ نهایی و تنظیمات پیشرفته) پاس می‌شوند.
+وضعیت بررسی‌شده‌ی همین مخزن: `assembleDebug` و `assembleRelease` موفق، و ۴۹ تست واحد (لینک‌ها، YAML، JSON، base64، ساخت کانفیگ نهایی، تنظیمات پیشرفته، QR و سنجش ترافیک) پاس می‌شوند.
 
 `scripts/check_sources.js` (در CI هم اجرا می‌شود) همه‌ی `R.string.*`ها را با هر دو فایل رشته و رفرنس‌های مانیفست/XML بررسی می‌کند.
 
@@ -324,6 +324,7 @@ android.aapt2FromMavenOverride=C:/path/to/android-sdk/build-tools/35.0.0/aapt2.e
 radx import https://example.com/sub --name main
 radx nodes --profile 1
 radx ping --select-fastest
+radx bench --cores ./cores --select-fastest      # سرعت واقعی هر نود، نه TCP ping
 radx gen --mode proxy --out ./out --cores ./cores --check
 radx up  --mode proxy --cores ./cores            # تا Ctrl+C
 ```

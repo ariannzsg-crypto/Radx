@@ -60,6 +60,13 @@
     <string name="no_nodes">No nodes available</string>
     <string name="node_delay_ms">%1$d ms</string>
     <string name="node_delay_timeout">Timeout</string>
+    <string name="node_traffic_mbps">%1$d Mbps</string>
+    <string name="node_traffic_none">No traffic</string>
+    <string name="qr_show">Show QR</string>
+    <string name="qr_title">Config QR</string>
+    <string name="qr_too_large">This config is too large for a QR code. Use copy or share instead.</string>
+    <string name="qr_scan_hint">Point the camera at a config or subscription QR code</string>
+    <string name="qr_scan_open">Scan QR</string>
     <string name="nodes_count">%1$d nodes</string>
 
     <string name="settings">Settings</string>

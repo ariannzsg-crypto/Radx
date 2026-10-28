@@ -6,6 +6,15 @@ import android.net.Uri
 import android.net.VpnService
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -32,10 +41,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.radx.app.R
 import com.radx.app.data.Profile
@@ -44,6 +57,8 @@ import com.radx.app.ui.components.GlassBackdrop
 import com.radx.app.ui.components.GlassNavBar
 import com.radx.app.ui.components.ImportSheet
 import com.radx.app.ui.components.LocalGlassEffects
+import com.radx.app.ui.components.QrImageDialog
+import com.radx.app.qr.QrCodec
 import com.radx.app.ui.screens.HomeScreen
 import com.radx.app.ui.screens.LogsScreen
 import com.radx.app.ui.screens.NodesScreen
@@ -73,7 +88,19 @@ private fun RadxAppContent(state: UiState, viewModel: RadxViewModel) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var showImport by rememberSaveable { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<Profile?>(null) }
+    var qrTarget by remember { mutableStateOf<Profile?>(null) }
     var autoConnectDone by rememberSaveable { mutableStateOf(false) }
+
+    // The whole surface eases in once, instead of popping in with the first frame.
+    // Slides follow the reading direction, so the same motion feels right in Persian.
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    var entered by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { entered = true }
+    val entrance by animateFloatAsState(
+        targetValue = if (entered) 1f else 0f,
+        animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
+        label = "entrance",
+    )
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -149,15 +176,46 @@ private fun RadxAppContent(state: UiState, viewModel: RadxViewModel) {
                 ),
                 selected = tab,
                 onSelect = { tab = it },
+                modifier = Modifier.graphicsLayer {
+                    alpha = entrance
+                    translationY = (1f - entrance) * 48.dp.toPx()
+                },
             )
         },
     ) { padding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
+                .padding(padding)
+                .graphicsLayer {
+                    alpha = entrance
+                    translationY = (1f - entrance) * 16.dp.toPx()
+                    val scale = 0.985f + 0.015f * entrance
+                    scaleX = scale
+                    scaleY = scale
+                },
         ) {
-            when (tab) {
+            AnimatedContent(
+                targetState = tab,
+                modifier = Modifier.fillMaxSize(),
+                transitionSpec = {
+                    val forward = targetState > initialState
+                    val shift = if (rtl) -1 else 1
+                    (
+                        fadeIn(tween(220)) +
+                            slideInHorizontally(tween(260)) { width ->
+                                shift * if (forward) width / 8 else -width / 8
+                            }
+                        ).togetherWith(
+                        fadeOut(tween(150)) +
+                            slideOutHorizontally(tween(200)) { width ->
+                                -shift * if (forward) width / 10 else -width / 10
+                            },
+                    )
+                },
+                label = "tab",
+            ) { index ->
+                when (index) {
                 0 -> HomeScreen(
                     state = state,
                     onToggle = onToggle,
@@ -172,6 +230,7 @@ private fun RadxAppContent(state: UiState, viewModel: RadxViewModel) {
                     onShareProfile = { profile ->
                         shareText(profile.raw.ifBlank { profile.subscriptionUrl.orEmpty() })
                     },
+                    onShowQr = { profile -> qrTarget = profile },
                 )
 
                 1 -> NodesScreen(
@@ -186,6 +245,7 @@ private fun RadxAppContent(state: UiState, viewModel: RadxViewModel) {
                     state = state,
                     onUpdate = viewModel::updateSettings,
                 )
+                }
             }
         }
     }
@@ -200,6 +260,15 @@ private fun RadxAppContent(state: UiState, viewModel: RadxViewModel) {
                 showImport = false
                 viewModel.importFile(uri)
             },
+        )
+    }
+
+    val qr = qrTarget
+    if (qr != null) {
+        QrImageDialog(
+            payload = QrCodec.payload(qr.subscriptionUrl, qr.raw),
+            title = stringResource(R.string.qr_title),
+            onDismiss = { qrTarget = null },
         )
     }
 

@@ -27,6 +27,8 @@ radx — Radx for Windows and Linux (same config pipeline as the Android app)
   radx nodes  [--profile N] [--select N]   show the nodes of a config
   radx ping   [--profile N] [--select-fastest]
                                            measure TCP latency for every node
+  radx bench  [--profile N] [--limit N] [--url URL] [--cores DIR] [--no-xray] [--quiet]
+              [--select-fastest]            download through every node and rank real speed
   radx gen    [--profile N] [--node N] [--mode proxy|tun] [--port N] [--out DIR] [--check]
               [--mtu N] [--block-quic] [--no-bypass-lan] [--log-level error|warn|info|debug]
                                            write the sing-box and Xray configs
@@ -55,6 +57,7 @@ fun main(args: Array<String>) {
             "list", "profiles" -> listProfiles(store)
             "nodes" -> listNodes(cli, store)
             "ping" -> pingNodes(cli, store)
+            "bench", "speed" -> benchNodes(cli, store)
             "gen", "config" -> generate(cli, store)
             "up", "connect" -> connect(cli, store)
             else -> die("unknown command: ${cli.positional.first()} (try: radx --help)")
@@ -160,6 +163,35 @@ private fun pingNodes(cli: Args, store: DesktopStore) {
         val fastest = ordered.firstOrNull { it.second != null }?.first ?: die("every node timed out")
         store.upsert(profile.copy(selectedTag = fastest.tag))
         info("selected the fastest node: ${fastest.name}")
+    }
+}
+
+private fun benchNodes(cli: Args, store: DesktopStore) {
+    val state = store.read()
+    val profile = pickProfile(cli, state) ?: die("no config yet — add one with: radx import <url>")
+    if (profile.nodes.isEmpty()) die("the profile has no nodes")
+    val quiet = cli.flag("quiet")
+    val limit = cli.int("limit")?.coerceAtLeast(1)
+    val settings = settingsFor(cli, state.settings).copy(tunnelMode = TunnelMode.PROXY)
+    val count = limit?.let { minOf(it, profile.nodes.size) } ?: profile.nodes.size
+    if (!quiet) info("downloading through $count node(s); this takes a few seconds per node")
+    val samples = Bench.run(
+        profile = profile,
+        settings = settings,
+        coresDirectory = cli.value("cores"),
+        url = cli.value("url") ?: Bench.DEFAULT_URL,
+        limit = limit,
+        skipXray = cli.flag("no-xray"),
+    )
+    samples.forEach { sample ->
+        val marker = if (sample.node.tag == profile.selectedTag) "*" else " "
+        val value = sample.error?.let { "failed: $it" } ?: "%.2f Mbps  %d ms".format(sample.mbps, sample.millis)
+        println("$marker #%-3d %-40s %s".format(sample.index + 1, sample.node.name.take(39), value))
+    }
+    if (cli.flag("select-fastest")) {
+        val best = Bench.fastest(samples) ?: die("no node carried any traffic")
+        store.upsert(profile.copy(selectedTag = best.tag))
+        info("selected the fastest node by real throughput: ${best.name}")
     }
 }
 
