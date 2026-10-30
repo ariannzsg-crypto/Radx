@@ -1,5 +1,6 @@
 package com.radx.app.ui.components
 
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -49,7 +50,16 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * The tunnel switch, drawn as a cloud.
+ * The tunnel switch, drawn as a floating, sculpted cloud.
+ *
+ * The cloud never lands: it drifts up and down on a slow cycle while rocking a few
+ * degrees in each axis, so the perspective keeps shifting. The pool of shadow underneath
+ * stays on the ground and opens up as the cloud lifts, which is what sells the float.
+ *
+ * Depth is built up in layers rather than with a flat silhouette: a shaded slab behind
+ * the face gives the body thickness, every puff gets its own highlight and contact shadow
+ * so the lobes read as spheres, the belly darkens toward the bottom, and the rim light is
+ * bright at the top and faint where it meets the shadow.
  *
  * Idle it is a dim, quiet cloud with the power mark in it. Connected it becomes a
  * thundercloud: the accent gradient fills it, lightning flickers inside on an irregular
@@ -106,17 +116,51 @@ fun ConnectButton(
         initialValue = 0.985f,
         targetValue = 1.008f,
         animationSpec = infiniteRepeatable(
-            tween(4600, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+            tween(4600, easing = FastOutSlowInEasing),
             RepeatMode.Reverse,
         ),
         label = "cloud_breathe",
     )
+    // The hover cycle: 0 is the cloud at its lowest, 1 at its highest.
+    val hover by storm.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            tween(3400, easing = FastOutSlowInEasing),
+            RepeatMode.Reverse,
+        ),
+        label = "cloud_hover",
+    )
+    // A lazy rock in both axes, out of phase, so the shading on the volume moves.
+    val rockX by storm.animateFloat(
+        initialValue = -1f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            tween(5200, easing = FastOutSlowInEasing),
+            RepeatMode.Reverse,
+        ),
+        label = "cloud_rock_x",
+    )
+    val rockY by storm.animateFloat(
+        initialValue = 1f,
+        targetValue = -1f,
+        animationSpec = infiniteRepeatable(
+            tween(6600, easing = FastOutSlowInEasing),
+            RepeatMode.Reverse,
+        ),
+        label = "cloud_rock_y",
+    )
+    // Negative moves the whole group up. The shadow compensates for this below so it
+    // stays put while the cloud rises away from it. Kept in dp and converted where the
+    // density scope is available: both the layer and the draw scope need pixels.
+    val floatY = 9.dp * (0.5f - hover) * 2f
     val flash = if (connected) strike else 0f
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(268.dp),
+            .height(268.dp)
+            .graphicsLayer { translationY = floatY.toPx() },
         contentAlignment = Alignment.Center,
     ) {
         Canvas(
@@ -125,12 +169,20 @@ fun ConnectButton(
                 .graphicsLayer {
                     scaleX = breathe
                     scaleY = breathe
+                    rotationX = rockX * 5f
+                    rotationY = rockY * 4f
+                    cameraDistance = 11f * density
                 },
         ) {
             val cloudWidth = size.width * 0.96f
             val cloudHeight = size.height * 0.66f
             val left = (size.width - cloudWidth) / 2f
             val top = (size.height - cloudHeight) / 2f
+            // The ground the shadow rests on, held still while the cloud hovers.
+            val ground = size.height * 0.82f
+            val shadowY = ground - floatY.toPx()
+            val shadowReach = cloudWidth * 0.21f * (1f - 0.16f * hover)
+            val shadowAlpha = 0.30f - 0.13f * hover
 
             // Halo: quiet while idle, a lit storm sky once the tunnel is up.
             drawCircle(
@@ -166,39 +218,169 @@ fun ConnectButton(
                 }
             }
 
+            // Ground shadow: three overlapping pools read as one soft, wide ellipse.
+            // It shrinks and fades as the cloud climbs, which is what makes the hover
+            // feel like height instead of a translation.
+            listOf(-1f, 0f, 1f).forEach { side ->
+                val spot = Offset(center.x + side * shadowReach, shadowY)
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color.Black.copy(alpha = shadowAlpha * if (side == 0f) 1f else 0.8f),
+                            Color.Transparent,
+                        ),
+                        center = spot,
+                        radius = shadowReach,
+                    ),
+                    radius = shadowReach,
+                    center = spot,
+                )
+            }
+            if (lit > 0.05f) {
+                // The thundercloud throws its own glow onto the ground under it.
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            accent.primary.copy(alpha = 0.14f + 0.22f * flash),
+                            Color.Transparent,
+                        ),
+                        center = Offset(center.x, shadowY),
+                        radius = shadowReach * 1.4f,
+                    ),
+                    radius = shadowReach * 1.4f,
+                    center = Offset(center.x, shadowY),
+                )
+            }
+
             val cloud = cloudPath(cloudWidth, cloudHeight).apply { translate(Offset(left, top)) }
 
+            // Thickness: a shaded slab drawn behind the face, so the silhouette has a
+            // body instead of being a sticker.
+            val depth = 7.dp.toPx()
+            val slabPath = Path().apply {
+                addPath(cloud)
+                translate(Offset(0f, depth))
+            }
+            drawPath(
+                path = slabPath,
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        lerp(
+                            from = if (glass) Color(0x8A05070E) else Color(0xFF05070E),
+                            to = lerp(accent.secondary, Color.Black, 0.55f),
+                            lit,
+                        ),
+                        lerp(
+                            from = if (glass) Color(0x5903050A) else Color(0xFF03050A),
+                            to = lerp(accent.secondary, Color.Black, 0.78f),
+                            lit,
+                        ),
+                    ),
+                    startY = top,
+                    endY = top + cloudHeight + depth,
+                ),
+            )
+
+            // The face: light at the crown, mid tone in the belly, deep shade at the base.
+            drawPath(
+                path = cloud,
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        lerp(cloudIdleTop(glass), lerp(accent.primary, Color.White, 0.30f), lit),
+                        lerp(cloudIdleMid(glass), accent.primary, lit),
+                        lerp(cloudIdleBottom(glass), lerp(accent.secondary, Color.Black, 0.28f), lit),
+                    ),
+                    startY = top,
+                    endY = top + cloudHeight,
+                ),
+            )
+
+            // Every puff lit from the upper left and shaded where it meets the body.
+            // Each pool fades to nothing inside its own lobe, so no seam can show.
+            lobes(cloudWidth, cloudHeight).forEach { (cx, cy, radius) ->
+                val puff = Offset(left + cx, top + cy)
+                val litFrom = Offset(puff.x - radius * 0.22f, puff.y - radius * 0.26f)
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.32f + 0.20f * lit),
+                            Color.Transparent,
+                        ),
+                        center = litFrom,
+                        radius = radius * 0.66f,
+                    ),
+                    radius = radius,
+                    center = puff,
+                )
+                val restingOn = Offset(puff.x + radius * 0.10f, puff.y + radius * 0.40f)
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color.Black.copy(alpha = 0.30f - 0.10f * lit),
+                            Color.Transparent,
+                        ),
+                        center = restingOn,
+                        radius = radius * 0.58f,
+                    ),
+                    radius = radius,
+                    center = puff,
+                )
+            }
+            // Round out the belly so the base curves away from the light too.
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color.Black.copy(alpha = 0.26f),
+                        Color.Transparent,
+                    ),
+                    center = Offset(left + cloudWidth * 0.5f, top + cloudHeight * 0.64f),
+                    radius = cloudWidth * 0.14f,
+                ),
+                radius = cloudWidth * 0.14f,
+                center = Offset(left + cloudWidth * 0.5f, top + cloudHeight * 0.64f),
+            )
+            // A small specular on the crown: the one cue that says the surface is wet.
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = (0.30f + 0.35f * lit) * (0.55f + 0.45f * lit)),
+                        Color.Transparent,
+                    ),
+                    center = Offset(left + cloudWidth * 0.51f, top + cloudHeight * 0.24f),
+                    radius = cloudWidth * 0.055f,
+                ),
+                radius = cloudWidth * 0.055f,
+                center = Offset(left + cloudWidth * 0.51f, top + cloudHeight * 0.24f),
+            )
+
+            // The whole cloud brightens for a moment on each strike.
+            if (flash > 0.01f) {
+                drawPath(path = cloud, color = Color.White.copy(alpha = 0.28f * flash))
+            }
+            // Rim light: bright along the crown, almost gone where the body meets shadow.
             drawPath(
                 path = cloud,
                 brush = when {
-                    lit > 0.02f -> Brush.verticalGradient(
+                    lit > 0.5f -> Brush.verticalGradient(
                         colors = listOf(
-                            lerp(cloudIdleTop(glass), accent.primary, lit),
-                            lerp(cloudIdleBottom(glass), accent.secondary, lit),
+                            Color.White.copy(alpha = 0.55f),
+                            Color.White.copy(alpha = 0.12f),
                         ),
                         startY = top,
                         endY = top + cloudHeight,
                     )
 
-                    else -> Brush.verticalGradient(
-                        colors = listOf(cloudIdleTop(glass), cloudIdleBottom(glass)),
+                    glass -> Brush.verticalGradient(
+                        colors = listOf(Color(0x66FFFFFF), Color(0x1FFFFFFF)),
                         startY = top,
                         endY = top + cloudHeight,
                     )
-                },
-            )
-            // The whole cloud brightens for a moment on each strike.
-            if (flash > 0.01f) {
-                drawPath(path = cloud, color = Color.White.copy(alpha = 0.28f * flash))
-            }
-            drawPath(
-                path = cloud,
-                color = if (lit > 0.5f) {
-                    Color.White.copy(alpha = 0.35f)
-                } else if (glass) {
-                    Color(0x47FFFFFF)
-                } else {
-                    outline
+
+                    else -> Brush.verticalGradient(
+                        colors = listOf(Color(0x33FFFFFF), outline.copy(alpha = 0.55f)),
+                        startY = top,
+                        endY = top + cloudHeight,
+                    )
                 },
                 style = Stroke(width = 1.4.dp.toPx()),
             )
@@ -256,11 +438,26 @@ fun ConnectButton(
 private fun cloudIdleTop(glass: Boolean): Color =
     if (glass) Color(0x2EFFFFFF) else RadxSurfaceElevated
 
+private fun cloudIdleMid(glass: Boolean): Color =
+    if (glass) Color(0x1AFFFFFF) else Color(0xFF0E1728)
+
 private fun cloudIdleBottom(glass: Boolean): Color =
     if (glass) Color(0x0DFFFFFF) else Color(0xFF121C2D)
 
 private fun lerp(from: Color, to: Color, fraction: Float): Color =
     androidx.compose.ui.graphics.lerp(from, to, fraction.coerceIn(0f, 1f))
+
+/**
+ * The three lobes as (center x, center y, radius) in the cloud's own coordinate space.
+ *
+ * Shared by the outline and by the shading, so every highlight sits exactly on the puff
+ * it belongs to.
+ */
+private fun lobes(width: Float, height: Float): List<Triple<Float, Float, Float>> = listOf(
+    Triple(width * 0.32f, height * 0.47f, height * 0.24f),
+    Triple(width * 0.51f, height * 0.30f, height * 0.30f),
+    Triple(width * 0.71f, height * 0.48f, height * 0.22f),
+)
 
 /**
  * A cloud as one outline: a rounded base with three lobes merged into it.
@@ -277,11 +474,7 @@ private fun cloudPath(width: Float, height: Float): Path {
             ),
         )
     }
-    listOf(
-        Triple(width * 0.32f, height * 0.47f, height * 0.24f),
-        Triple(width * 0.51f, height * 0.30f, height * 0.30f),
-        Triple(width * 0.71f, height * 0.48f, height * 0.22f),
-    ).forEach { (cx, cy, radius) ->
+    lobes(width, height).forEach { (cx, cy, radius) ->
         val lobe = Path().apply {
             addOval(Rect(cx - radius, cy - radius, cx + radius, cy + radius))
         }
