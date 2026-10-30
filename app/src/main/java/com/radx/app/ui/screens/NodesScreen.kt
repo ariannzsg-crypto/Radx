@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -67,6 +70,7 @@ fun NodesScreen(
     state: UiState,
     onSelect: (String) -> Unit,
     onPing: () -> Unit,
+    twoColumns: Boolean = false,
 ) {
     val profile = state.selectedProfile
     var query by rememberSaveable { mutableStateOf("") }
@@ -178,6 +182,26 @@ fun NodesScreen(
                 text = stringResource(R.string.no_nodes),
                 icon = Icons.Rounded.Dns,
             )
+
+            twoColumns -> LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                gridItems(nodes, key = { it.tag }) { node ->
+                    NodeRow(
+                        node = node,
+                        selected = node.tag == profile.selectedTag,
+                        delay = state.delays[node.tag],
+                        pinging = state.pinging && state.delays[node.tag] == null,
+                        traffic = state.trafficResults[node.name],
+                        trafficChecking = state.trafficCheckingNode == node.name,
+                        onClick = { onSelect(node.tag) },
+                    )
+                }
+            }
 
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize(),

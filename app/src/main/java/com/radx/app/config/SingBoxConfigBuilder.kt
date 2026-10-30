@@ -50,10 +50,17 @@ object SingBoxConfigBuilder {
         settings: AppSettings,
         xrayAvailable: Boolean = true,
         xraySkip: Set<Int> = emptySet(),
+        proxyPort: Int? = null,
     ): String {
         require(profile.nodes.isNotEmpty()) { "This profile has no nodes" }
 
-        val nodes = usableNodes(profile, xrayAvailable, xraySkip)
+        val nodes = usableNodes(
+            profile = profile,
+            xrayAvailable = xrayAvailable,
+            xraySkip = xraySkip,
+            muxEnabled = settings.muxEnabled,
+            muxStreams = settings.muxConcurrency,
+        )
         require(nodes.isNotEmpty()) { "Every node of this profile needs the Xray core" }
         val activeTag = nodes[activeIndex(profile, nodes)].tag
 
@@ -68,7 +75,7 @@ object SingBoxConfigBuilder {
             put("dns", dnsConfig(settings, bootstrapDomains(nodes)))
             put(
                 "inbounds",
-                buildJsonArray { add(inbound(settings)) },
+                buildJsonArray { inbounds(settings, proxyPort).forEach { add(it) } },
             )
             put(
                 "outbounds",
@@ -97,7 +104,9 @@ object SingBoxConfigBuilder {
                     put(
                         "rules",
                         buildJsonArray {
-                            add(buildJsonObject { put("action", "sniff") })
+                            if (settings.sniffing) {
+                                add(buildJsonObject { put("action", "sniff") })
+                            }
                             add(
                                 buildJsonObject {
                                     put("protocol", "dns")
@@ -123,6 +132,7 @@ object SingBoxConfigBuilder {
                                     },
                                 )
                             }
+                            hostRules(settings).forEach { add(it) }
                         },
                     )
                     put("final", SELECTOR_TAG)
@@ -165,17 +175,59 @@ object SingBoxConfigBuilder {
         profile: Profile,
         xrayAvailable: Boolean,
         xraySkip: Set<Int>,
+        muxEnabled: Boolean = false,
+        muxStreams: Int = 8,
     ): List<ProxyNode> =
         assignTags(profile.nodes)
             .withIndex()
             .filter { (index, node) -> !node.viaXray || (xrayAvailable && index !in xraySkip) }
             .map { (index, node) ->
                 if (node.viaXray) {
+                    // The Xray bridge is a loopback SOCKS hop, so multiplexing it would
+                    // only add a second mux layer inside the core's own connection.
                     node.copy(outbound = bridgeOutbound(node.tag, XrayBridge.port(index)))
                 } else {
-                    node
+                    withMultiplex(node, muxEnabled, muxStreams)
                 }
             }
+
+    /** Turns multiplexing on for a node, capped to what the core accepts. */
+    private fun withMultiplex(node: ProxyNode, enabled: Boolean, streams: Int): ProxyNode {
+        if (!enabled) return node
+        val multiplex = buildJsonObject {
+            put("enabled", true)
+            put("protocol", "h2mux")
+            put("max_streams", streams.coerceIn(AppSettings.MIN_MUX_STREAMS, AppSettings.MAX_MUX_STREAMS))
+        }
+        val rebuilt = JsonObject(node.outbound.toMutableMap().apply { put("multiplex", multiplex) })
+        return node.copy(outbound = rebuilt)
+    }
+
+    /**
+     * `domain:address` pairs from the settings, as routing rules.
+     *
+     * The traffic still leaves through the tunnel, but the core dials the address the
+     * user pinned instead of resolving the name again.
+     */
+    private fun hostRules(settings: AppSettings): List<JsonObject> =
+        hostMapping(settings.dnsHosts).map { (domain, address) ->
+            buildJsonObject {
+                put("domain", buildJsonArray { add(domain) })
+                // A rule that rewrites the destination still has to say where the flow
+                // goes, so it keeps routing through the selected node.
+                put("outbound", SELECTOR_TAG)
+                put("override_address", address)
+            }
+        }
+
+    internal fun hostMapping(raw: String): List<Pair<String, String>> =
+        raw.split(',', '\n')
+            .mapNotNull { entry ->
+                val domain = entry.substringBefore(':', "").trim()
+                val address = entry.substringAfter(':', "").trim()
+                if (domain.isEmpty() || address.isEmpty()) null else domain to address
+            }
+            .filter { (_, address) -> !address.contains(' ') }
 
     private fun activeIndex(profile: Profile, nodes: List<ProxyNode>): Int =
         nodes.indexOfFirst { it.tag == profile.selectedTag }.takeIf { it >= 0 } ?: 0
@@ -222,6 +274,11 @@ object SingBoxConfigBuilder {
     private val IPV4_HOST = Regex("""^\d{1,3}(\.\d{1,3}){3}$""")
 
     private fun dnsConfig(settings: AppSettings, bootstrap: List<String>): JsonObject = buildJsonObject {
+        // A separate direct resolver is only worth a server entry when it differs from
+        // the local one; otherwise the local resolver already does that job.
+        val directResolver = settings.directDns.trim()
+            .takeIf { it.isNotEmpty() && it != settings.localDns.trim() }
+        val bootstrapServer = if (directResolver != null) "dns-direct" else "dns-local"
         put(
             "servers",
             buildJsonArray {
@@ -234,20 +291,45 @@ object SingBoxConfigBuilder {
                         // proxy exists, so bootstrap it through the direct resolver.
                         hostOf(settings.remoteDns)
                             ?.takeIf { !isIpLiteral(it) }
-                            ?.let { put("address_resolver", "dns-local") }
+                            ?.let { put("address_resolver", bootstrapServer) }
                     },
                 )
                 add(
                     buildJsonObject {
                         put("tag", "dns-local")
-                        put("address", settings.localDns)
+                        // With the core's own resolver switched off, the tunnel DNS the
+                        // user picked is what names get looked up against.
+                        put(
+                            "address",
+                            if (settings.localDnsEnabled) {
+                                settings.localDns.ifBlank { settings.vpnDns }
+                            } else {
+                                settings.vpnDns.ifBlank { settings.localDns }
+                            },
+                        )
                         put("detour", DIRECT_TAG)
                     },
                 )
+                if (directResolver != null) {
+                    add(
+                        buildJsonObject {
+                            put("tag", "dns-direct")
+                            put("address", directResolver)
+                            put("detour", DIRECT_TAG)
+                        },
+                    )
+                }
             },
         )
         put("final", "dns-remote")
-        put("strategy", if (settings.ipv6) "prefer_ipv4" else "ipv4_only")
+        put(
+            "strategy",
+            when {
+                !settings.ipv6 -> "ipv4_only"
+                settings.preferIpv6 -> "prefer_ipv6"
+                else -> "prefer_ipv4"
+            },
+        )
         if (bootstrap.isNotEmpty()) {
             put(
                 "rules",
@@ -263,31 +345,71 @@ object SingBoxConfigBuilder {
         }
     }
 
-    private fun inbound(settings: AppSettings): JsonObject =
+    /**
+     * The inbounds this build needs: the tunnel in VPN mode, plus the local proxy when
+     * the user wants one, or only the local proxy in proxy mode.
+     */
+    private fun inbounds(settings: AppSettings, proxyPort: Int?): List<JsonObject> {
+        val list = mutableListOf<JsonObject>()
         if (settings.tunnelMode == TunnelMode.VPN) {
-            buildJsonObject {
-                put("type", "tun")
-                put("tag", "tun-in")
-                put(
-                    "address",
-                    buildJsonArray {
-                        add(TUN_IPV4)
-                        if (settings.ipv6) add(TUN_IPV6)
-                    },
-                )
-                put("mtu", settings.tunMtu.coerceIn(AppSettings.MIN_MTU, AppSettings.MAX_MTU))
-                put("auto_route", true)
-                put("strict_route", false)
-                put("stack", "gvisor")
-            }
+            list += tunInbound(settings)
+            if (settings.localProxy) list += mixedInbound(settings, proxyPort)
         } else {
-            buildJsonObject {
-                put("type", "mixed")
-                put("tag", "mixed-in")
-                put("listen", if (settings.allowLan) "0.0.0.0" else "127.0.0.1")
-                put("listen_port", settings.proxyPort.coerceIn(MIN_PROXY_PORT, MAX_PROXY_PORT))
-            }
+            list += mixedInbound(settings, proxyPort)
         }
+        return list
+    }
+
+    private fun tunInbound(settings: AppSettings): JsonObject = buildJsonObject {
+        put("type", "tun")
+        put("tag", "tun-in")
+        put(
+            "address",
+            buildJsonArray {
+                add(tunAddress(settings))
+                if (settings.ipv6) add(TUN_IPV6)
+            },
+        )
+        put("mtu", settings.tunMtu.coerceIn(AppSettings.MIN_MTU, AppSettings.MAX_MTU))
+        put("auto_route", true)
+        put("strict_route", false)
+        put("stack", "gvisor")
+        // routeOnly: rule on the sniffed domain, but dial the address the app asked for.
+        put("sniff_override_destination", !settings.routeOnly)
+    }
+
+    private fun mixedInbound(settings: AppSettings, proxyPort: Int?): JsonObject = buildJsonObject {
+        put("type", "mixed")
+        put("tag", "mixed-in")
+        put("listen", if (settings.allowLan) "0.0.0.0" else "127.0.0.1")
+        put(
+            "listen_port",
+            (proxyPort ?: settings.proxyPort).coerceIn(MIN_PROXY_PORT, MAX_PROXY_PORT),
+        )
+        put("sniff_override_destination", !settings.routeOnly)
+        // The core only knows inbound authentication as a list of users, and only for
+        // the SOCKS side of the mixed inbound.
+        val user = settings.proxyUser.trim()
+        if (user.isNotEmpty()) {
+            put(
+                "users",
+                buildJsonArray {
+                    add(
+                        buildJsonObject {
+                            put("username", user)
+                            put("password", settings.proxyPass)
+                        },
+                    )
+                },
+            )
+        }
+    }
+
+    /** A valid /30 around the address the user picked, or the default when it is not one. */
+    private fun tunAddress(settings: AppSettings): String {
+        val host = settings.tunAddress.trim()
+        return if (IPV4_HOST.matches(host)) "$host/30" else TUN_IPV4
+    }
 
     /**
      * Node tags must stay unique and must not shadow our own outbound tags, because

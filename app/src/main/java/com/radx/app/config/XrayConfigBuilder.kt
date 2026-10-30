@@ -1,5 +1,7 @@
 package com.radx.app.config
 
+import com.radx.app.data.AppSettings
+import com.radx.app.data.LogLevel
 import com.radx.app.data.ProxyNode
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -85,7 +87,11 @@ object XrayConfigBuilder {
      * @throws IllegalArgumentException when the profile carries more Xray nodes than
      * the bridged port range allows.
      */
-    fun build(nodes: List<ProxyNode>, skip: Set<Int> = emptySet()): String? {
+    fun build(
+        nodes: List<ProxyNode>,
+        skip: Set<Int> = emptySet(),
+        settings: AppSettings? = null,
+    ): String? {
         val bridged = nodes.withIndex().filter { it.value.viaXray && it.index !in skip }
         if (bridged.isEmpty()) return null
         require(bridged.size <= XrayBridge.MAX_NODES) {
@@ -96,9 +102,10 @@ object XrayConfigBuilder {
             put(
                 "log",
                 buildJsonObject {
-                    // "info" is what makes the log screen show which node a
-                    // connection used; the app keeps only the last few hundred lines.
-                    put("loglevel", "info")
+                    // The log screen shows which node a connection used, so it follows
+                    // the level picked in the settings; the app keeps the last few
+                    // hundred lines either way.
+                    put("loglevel", xrayLogLevel(settings?.logLevel))
                 },
             )
             put(
@@ -108,16 +115,13 @@ object XrayConfigBuilder {
                         add(
                             buildJsonObject {
                                 put("tag", inboundTag(index))
-                                put("listen", "127.0.0.1")
+                                // The bridge is loopback-only unless the user opened the
+                                // local proxy to the LAN, which is also when the
+                                // credentials in the settings start to matter.
+                                put("listen", if (settings?.allowLan == true) "0.0.0.0" else "127.0.0.1")
                                 put("port", XrayBridge.port(index))
                                 put("protocol", "socks")
-                                put(
-                                    "settings",
-                                    buildJsonObject {
-                                        put("auth", "noauth")
-                                        put("udp", true)
-                                    },
-                                )
+                                put("settings", socksSettings(settings))
                             },
                         )
                     }
@@ -127,13 +131,7 @@ object XrayConfigBuilder {
                 "outbounds",
                 buildJsonArray {
                     bridged.forEach { (index, node) ->
-                        add(
-                            JsonObject(
-                                node.xray!!.toMutableMap().apply {
-                                    put("tag", JsonPrimitive(outboundTag(index)))
-                                },
-                            ),
-                        )
+                        add(outbound(node.xray!!, outboundTag(index), settings))
                     }
                     add(
                         buildJsonObject {
@@ -170,6 +168,64 @@ object XrayConfigBuilder {
     fun inboundTag(index: Int): String = "$INBOUND_PREFIX$index"
 
     fun outboundTag(index: Int): String = "$OUTBOUND_PREFIX$index"
+
+    /** The level names the core itself accepts. */
+    private fun xrayLogLevel(level: LogLevel?): String = when (level) {
+        LogLevel.ERROR -> "error"
+        LogLevel.WARN -> "warning"
+        LogLevel.DEBUG -> "debug"
+        else -> "info"
+    }
+
+    private fun socksSettings(settings: AppSettings?): JsonObject = buildJsonObject {
+        val user = settings?.proxyUser.orEmpty().trim()
+        if (user.isEmpty()) {
+            put("auth", "noauth")
+        } else {
+            put("auth", "password")
+            put(
+                "accounts",
+                buildJsonArray {
+                    add(
+                        buildJsonObject {
+                            put("user", user)
+                            put("pass", settings?.proxyPass.orEmpty())
+                        },
+                    )
+                },
+            )
+        }
+        put("udp", settings?.socksUdp ?: true)
+    }
+
+    /**
+     * The outbound with the app's transport tweaks applied.
+     *
+     * Both options live in the node's own stream settings, so they are added here
+     * rather than in the parser: switching them on must not need a re-import.
+     */
+    private fun outbound(source: JsonObject, tag: String, settings: AppSettings?): JsonObject {
+        val fields = source.toMutableMap()
+        fields["tag"] = JsonPrimitive(tag)
+        if (settings == null) return JsonObject(fields)
+
+        if (settings.muxEnabled) {
+            fields["mux"] = buildJsonObject {
+                put("enabled", true)
+                put("concurrency", settings.muxConcurrency.coerceIn(AppSettings.MIN_MUX_STREAMS, AppSettings.MAX_MUX_STREAMS))
+            }
+        }
+        if (settings.fragmentEnabled) {
+            val stream = (source["streamSettings"] as? JsonObject)?.toMutableMap() ?: mutableMapOf()
+            stream["fragment"] = buildJsonObject {
+                put("packets", "tlshello")
+                put("length", settings.fragmentSize.ifBlank { "100-200" })
+                put("interval", settings.fragmentInterval.ifBlank { "10-20" })
+            }
+            fields["streamSettings"] = JsonObject(stream)
+        }
+        return JsonObject(fields)
+    }
 
     private val REJECTED_OUTBOUND = Regex("failed to build outbound config with tag " + Regex.escape(OUTBOUND_PREFIX) + "(\\d+)")
 

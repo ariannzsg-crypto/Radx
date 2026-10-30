@@ -43,6 +43,41 @@ data class UiEvent(val message: String, val isError: Boolean = false)
 /** A dead node must fail within this window, not hang the check forever. */
 private const val TRAFFIC_TIMEOUT_MS = 12_000
 
+/**
+ * Everything a running tunnel baked into its config. A change to any of these needs the
+ * tunnel restarted; the rest of the settings only repaint the interface.
+ */
+private fun tunnelSignature(settings: AppSettings): List<Any> = listOf(
+    settings.tunnelMode,
+    settings.allowLan,
+    settings.ipv6,
+    settings.preferIpv6,
+    settings.localDns,
+    settings.localDnsEnabled,
+    settings.vpnDns,
+    settings.remoteDns,
+    settings.directDns,
+    settings.dnsHosts,
+    settings.sniffing,
+    settings.routeOnly,
+    settings.localProxy,
+    settings.dynamicProxyPort,
+    settings.proxyPort,
+    settings.proxyUser,
+    settings.proxyPass,
+    settings.socksUdp,
+    settings.muxEnabled,
+    settings.muxConcurrency,
+    settings.fragmentEnabled,
+    settings.fragmentSize,
+    settings.fragmentInterval,
+    settings.tunAddress,
+    settings.tunMtu,
+    settings.bypassLan,
+    settings.blockQuic,
+    settings.logLevel,
+)
+
 data class UiState(
     val profiles: List<Profile> = emptyList(),
     val selectedProfileId: String? = null,
@@ -307,12 +342,7 @@ class RadxViewModel(application: Application) : AndroidViewModel(application) {
             val updated = transform(current)
             store.saveSettings(updated)
             // Only a change that affects the tunnel needs a reconnect.
-            val tunnelChanged = current.tunnelMode != updated.tunnelMode ||
-                current.allowLan != updated.allowLan ||
-                current.ipv6 != updated.ipv6 ||
-                current.localDns != updated.localDns ||
-                current.remoteDns != updated.remoteDns ||
-                current.core != updated.core
+            val tunnelChanged = tunnelSignature(current) != tunnelSignature(updated)
             if (tunnelChanged) restartIfActive()
         }
     }

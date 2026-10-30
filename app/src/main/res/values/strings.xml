@@ -191,4 +191,63 @@
     <string name="apply">اعمال</string>
     <string name="connected_time">مدت اتصال: %1$s</string>
     <string name="traffic_total">%1$s</string>
+    <!-- Settings: interface and sections added in 1.4.0 -->
+    <string name="settings_ui">تنظیمات رابط</string>
+    <string name="settings_speed_display">نمایش سرعت</string>
+    <string name="settings_speed_display_desc">سرعت فعلی در اعلان نشان داده شود؛ آیکون نشان می‌دهد ترافیک از پروکسی می‌گذرد یا مستقیم است.</string>
+    <string name="settings_delete_confirm">تأیید حذف کانفیگ</string>
+    <string name="settings_delete_confirm_desc">حذف کانفیگ پیش از انجام، تأیید دوباره بگیرد.</string>
+    <string name="settings_two_columns">چیدمان دوستونه</string>
+    <string name="settings_two_columns_desc">لیست نودها دوستونه شود تا محتوای بیشتری در صفحه جا بگیرد.</string>
+    <string name="settings_dynamic_color">رنگ پویا</string>
+    <string name="settings_dynamic_color_desc">فقط روی اندروید ۱۲ به بالا کار می‌کند.</string>
+    <string name="settings_language">زبان</string>
+    <string name="language_auto">خودکار</string>
+    <string name="language_en">انگلیسی</string>
+    <string name="language_fa">فارسی</string>
+
+    <string name="settings_vpn">تنظیمات VPN</string>
+    <string name="settings_prefer_ipv6">ترجیح IPv6</string>
+    <string name="settings_prefer_ipv6_desc">هنگام حل نام دامنه، آدرس‌های IPv6 در اولویت باشند.</string>
+    <string name="settings_local_dns">DNS محلی</string>
+    <string name="settings_local_dns_desc">DNS را ماژول DNS هسته پردازش کند (برای مسیریابی جدا از شبکه‌ی محلی پیشنهاد می‌شود).</string>
+    <string name="settings_fakedns">FakeDNS</string>
+    <string name="settings_fakedns_desc">FakeDNS به هر نام یک آدرس ساختگی می‌دهد (سریع‌تر، ولی با بعضی برنامه‌ها سازگار نیست).</string>
+    <string name="settings_fakedns_unavailable">در این نسخه نیست؛ از DNS هسته استفاده کنید.</string>
+    <string name="settings_vpn_dns">DNS تونل (فقط IPv4/IPv6)</string>
+    <string name="settings_vpn_dns_desc">آدرسی که وقتی DNS محلی خاموش است به رابط تونل داده می‌شود.</string>
+    <string name="settings_interface_address">آدرس رابط VPN</string>
+    <string name="settings_interface_address_desc">آدرس IPv4 رابط تونل؛ پیشوند /۳۰ خودکار اضافه می‌شود.</string>
+
+    <string name="settings_core_section">تنظیمات هسته</string>
+    <string name="settings_sniffing">فعال‌سازی Sniffing</string>
+    <string name="settings_sniffing_desc">دامنه‌ی مقصد از دل ترافیک تشخیص داده شود (پیش‌فرض: روشن).</string>
+    <string name="settings_route_only">فعال‌سازی routeOnly</string>
+    <string name="settings_route_only_desc">از دامنه‌ی تشخیص‌داده‌شده فقط برای مسیریابی استفاده شود و مقصد همان آدرس IP بماند.</string>
+    <string name="settings_local_proxy">پروکسی محلی</string>
+    <string name="settings_local_proxy_desc">وقتی خاموش باشد هیچ SOCKS محلی‌ای نیست، پس به‌روزرسانی اشتراک هم از پروکسی رد نمی‌شود.</string>
+    <string name="settings_dynamic_port">پورت پویا برای پروکسی محلی</string>
+    <string name="settings_dynamic_port_desc">برای هر استارت یک پورت آزاد تصادفی انتخاب شود.</string>
+    <string name="settings_proxy_user">نام کاربری پروکسی محلی (اختیاری)</string>
+    <string name="settings_proxy_pass">رمز پروکسی محلی (اختیاری)</string>
+    <string name="settings_socks_udp">SOCKS5 UDP</string>
+    <string name="settings_socks_udp_desc">با UDP، احراز هویت SOCKS5 کاملاً امن نیست.</string>
+    <string name="settings_dns_direct">DNS مستقیم (اختیاری)</string>
+    <string name="settings_dns_direct_desc">این resolver برای نام‌ها و دامنه‌های نود استفاده می‌شود و از بیرون تونل جواب می‌گیرد.</string>
+    <string name="settings_dns_hosts">نگاشت دامنه‌ها (قالب: domain:address,…)</string>
+    <string name="settings_dns_hosts_desc">این نام‌ها بدون پرسیدن از resolver به همان آدرس می‌روند.</string>
+    <string name="settings_mux">تنظیمات Mux</string>
+    <string name="settings_mux_enable">فعال‌سازی Mux</string>
+    <string name="settings_mux_enable_desc">چند جریان روی یک اتصال به سرور جمع شود؛ روی سرورهای شلوغ کنفرانس بهتر است.</string>
+    <string name="settings_mux_streams">تعداد جریان هم‌زمان</string>
+    <string name="settings_fragment">تنظیمات Fragment</string>
+    <string name="settings_fragment_enable">تکه‌تکه کردن دست‌دادن TLS</string>
+    <string name="settings_fragment_enable_desc">ClientHello به چند بسته شکسته می‌شود تا DPI ساده فریب بخورد.</string>
+    <string name="settings_fragment_size">طول بسته‌ها (bytes)</string>
+    <string name="settings_fragment_interval">فاصله‌ی بسته‌ها (ms)</string>
+
+    <string name="notification_speeds">دانلود %1$s · آپلود %2$s</string>
+    <string name="total_usage">مصرف کل</string>
+    <string name="mode_proxy_short">پروکسی</string>
+    <string name="mode_vpn_short">VPN کامل</string>
 </resources>

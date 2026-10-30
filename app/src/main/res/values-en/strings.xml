@@ -191,4 +191,63 @@
     <string name="apply">Apply</string>
     <string name="connected_time">Connected for %1$s</string>
     <string name="traffic_total">%1$s</string>
+    <!-- Settings: interface and sections added in 1.4.0 -->
+    <string name="settings_ui">UI settings</string>
+    <string name="settings_speed_display">Enable speed display</string>
+    <string name="settings_speed_display_desc">Show current speeds in the notification. The icon indicates whether proxy or direct traffic is dominant.</string>
+    <string name="settings_delete_confirm">Delete config confirmation</string>
+    <string name="settings_delete_confirm_desc">Whether deleting a config requires a second confirmation by the user.</string>
+    <string name="settings_two_columns">Use two-column layout</string>
+    <string name="settings_two_columns_desc">Display the node list in two columns to fit more content on screen.</string>
+    <string name="settings_dynamic_color">Enable dynamic color</string>
+    <string name="settings_dynamic_color_desc">Only works on Android 12+ devices.</string>
+    <string name="settings_language">Language</string>
+    <string name="language_auto">auto</string>
+    <string name="language_en">English</string>
+    <string name="language_fa">Persian</string>
+
+    <string name="settings_vpn">VPN Settings</string>
+    <string name="settings_prefer_ipv6">Prefer IPv6</string>
+    <string name="settings_prefer_ipv6_desc">Prefer IPv6 addresses when resolving domain names.</string>
+    <string name="settings_local_dns">Enable local DNS</string>
+    <string name="settings_local_dns_desc">DNS processed by core\'s DNS module (recommended if you need routing bypassing LAN and mainland addresses).</string>
+    <string name="settings_fakedns">Enable FakeDNS</string>
+    <string name="settings_fakedns_desc">FakeDNS returns synthetic IP addresses for domain lookups (faster, but may not work with some apps).</string>
+    <string name="settings_fakedns_unavailable">Not part of this build — use the core resolver instead.</string>
+    <string name="settings_vpn_dns">VPN DNS (IPv4/IPv6 only)</string>
+    <string name="settings_vpn_dns_desc">Handed to the tunnel interface when the core resolver is off.</string>
+    <string name="settings_interface_address">VPN Interface Address</string>
+    <string name="settings_interface_address_desc">IPv4 address of the tunnel interface; the /30 prefix is added for you.</string>
+
+    <string name="settings_core_section">Core Settings</string>
+    <string name="settings_sniffing">Enable Sniffing</string>
+    <string name="settings_sniffing_desc">Detect destination domains from traffic (enabled by default).</string>
+    <string name="settings_route_only">Enable routeOnly</string>
+    <string name="settings_route_only_desc">Use the sniffed domain name for routing only, and keep the target address as the IP address.</string>
+    <string name="settings_local_proxy">Enable local proxy</string>
+    <string name="settings_local_proxy_desc">When disabled, no SOCKS proxy is available, so subscription updates and similar actions cannot use the proxy.</string>
+    <string name="settings_dynamic_port">Enable dynamic local proxy port</string>
+    <string name="settings_dynamic_port_desc">Use a random free local port for the proxy on every start.</string>
+    <string name="settings_proxy_user">Local proxy username (optional)</string>
+    <string name="settings_proxy_pass">Local proxy password (optional)</string>
+    <string name="settings_socks_udp">SOCKS5 UDP</string>
+    <string name="settings_socks_udp_desc">SOCKS5 authentication is not fully secure when using UDP.</string>
+    <string name="settings_dns_direct">Direct DNS (optional)</string>
+    <string name="settings_dns_direct_desc">Resolver for node servers and direct names; it answers from outside the tunnel.</string>
+    <string name="settings_dns_hosts">DNS host mappings (format: domain:address,…)</string>
+    <string name="settings_dns_hosts_desc">These names go straight to the address you pin, without a lookup.</string>
+    <string name="settings_mux">Mux Settings</string>
+    <string name="settings_mux_enable">Enable Mux</string>
+    <string name="settings_mux_enable_desc">Carry several streams over one server connection; a busy server copes better with it.</string>
+    <string name="settings_mux_streams">Streams per connection</string>
+    <string name="settings_fragment">Fragment Settings</string>
+    <string name="settings_fragment_enable">Fragment the TLS handshake</string>
+    <string name="settings_fragment_enable_desc">Split ClientHello across packets so naive DPI cannot match it.</string>
+    <string name="settings_fragment_size">Packet length (bytes)</string>
+    <string name="settings_fragment_interval">Packet interval (ms)</string>
+
+    <string name="notification_speeds">↓ %1$s · ↑ %2$s</string>
+    <string name="total_usage">Total usage</string>
+    <string name="mode_proxy_short">Proxy Mode</string>
+    <string name="mode_vpn_short">Full VPN</string>
 </resources>

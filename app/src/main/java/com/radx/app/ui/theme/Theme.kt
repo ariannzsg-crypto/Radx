@@ -1,13 +1,16 @@
 package com.radx.app.ui.theme
 
+import android.os.Build
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -108,15 +111,26 @@ private val RadxShapes = androidx.compose.material3.Shapes(
     extraLarge = RoundedCornerShape(28.dp),
 )
 
+/**
+ * @param dynamicColor take the palette from the wallpaper (Android 12+) instead of the
+ * accent chosen in the settings.
+ */
 @Composable
 fun RadxTheme(
     accent: AccentColor = AccentColor.CYAN,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val palette = accentOf(accent)
+    val context = LocalContext.current
+    val scheme = if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        dynamicDarkColorScheme(context)
+    } else {
+        schemeFor(palette)
+    }
     CompositionLocalProvider(LocalRadxAccent provides palette) {
         MaterialTheme(
-            colorScheme = schemeFor(palette),
+            colorScheme = scheme,
             typography = RadxTypography,
             shapes = RadxShapes,
             content = content,

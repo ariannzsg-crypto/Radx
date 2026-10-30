@@ -37,8 +37,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.radx.app.core.TrafficMonitor
 import java.io.File
+import java.net.InetAddress
+import java.net.ServerSocket
+import java.util.Locale
 
 /**
  * Hosts the proxy core.
@@ -56,6 +61,7 @@ class RadxVpnService : VpnService() {
     private var xraySession: XrayRunner.Session? = null
     private var tunInterface: ParcelFileDescriptor? = null
     private var startJob: Job? = null
+    private var speedJob: Job? = null
 
     /** What the core asked the system for, kept so the UI can show the real interface. */
     @Volatile
@@ -124,6 +130,9 @@ class RadxVpnService : VpnService() {
                 return@launch
             }
             val settings = store.readSettings()
+            // A dynamic port is resolved once per start, so the UI reports the port the
+            // tunnel really listens on instead of the configured one.
+            val proxyPort = if (settings.dynamicProxyPort) freePort() else settings.proxyPort
 
             try {
                 // Nodes whose transport only Xray understands run there, and sing-box
@@ -133,7 +142,7 @@ class RadxVpnService : VpnService() {
                 var xrayReady = false
                 if (bridged > 0) {
                     if (XrayRunner.isAvailable(this@RadxVpnService)) {
-                        xraySession = startXrayCore(profile, xraySkip)
+                        xraySession = startXrayCore(profile, xraySkip, settings)
                         xrayReady = true
                     } else {
                         Log.w(TAG, "xray core is not part of this build")
@@ -149,6 +158,7 @@ class RadxVpnService : VpnService() {
                     settings,
                     xrayAvailable = xrayReady,
                     xraySkip = xraySkip,
+                    proxyPort = proxyPort,
                 )
                 val implementation = CoreProvider.create()
                     ?: throw IllegalStateException(getString(R.string.error_no_core))
@@ -164,7 +174,7 @@ class RadxVpnService : VpnService() {
                 )
                 engine = implementation
 
-                publishTunnelInfo(profile, settings, xrayReady, xraySkip)
+                publishTunnelInfo(profile, settings, xrayReady, xraySkip, proxyPort)
 
                 val nodeName =
                     SingBoxConfigBuilder.activeNode(profile, xrayReady, xraySkip)?.name ?: profile.name
@@ -175,8 +185,8 @@ class RadxVpnService : VpnService() {
                         nodeName = nodeName,
                         mode = settings.tunnelMode,
                         since = System.currentTimeMillis(),
-                        proxyPort = if (settings.tunnelMode == TunnelMode.PROXY) {
-                            settings.proxyPort
+                        proxyPort = if (settings.tunnelMode == TunnelMode.PROXY || settings.localProxy) {
+                            proxyPort
                         } else {
                             0
                         },
@@ -191,6 +201,7 @@ class RadxVpnService : VpnService() {
                             getString(R.string.notification_connected, nodeName),
                         ),
                     )
+                    startSpeedUpdates(nodeName, settings)
                 }
             } catch (error: Throwable) {
                 Log.e(TAG, "failed to start tunnel", error)
@@ -207,10 +218,14 @@ class RadxVpnService : VpnService() {
      * that outbound in the error, so the failing node is removed and the core retried
      * instead of losing the whole profile.
      */
-    private suspend fun startXrayCore(profile: Profile, skip: MutableSet<Int>): XrayRunner.Session {
+    private suspend fun startXrayCore(
+        profile: Profile,
+        skip: MutableSet<Int>,
+        settings: AppSettings,
+    ): XrayRunner.Session {
         val firstXrayIndex = profile.nodes.indexOfFirst { it.viaXray }
         while (true) {
-            val config = XrayConfigBuilder.build(profile.nodes, skip)
+            val config = XrayConfigBuilder.build(profile.nodes, skip, settings)
                 ?: throw IllegalStateException(getString(R.string.error_no_usable_xray_node))
             try {
                 return XrayRunner.start(
@@ -259,6 +274,8 @@ class RadxVpnService : VpnService() {
     }
 
     private fun teardown() {
+        speedJob?.cancel()
+        speedJob = null
         runCatching { engine?.stop() }.onFailure { Log.w(TAG, "core stop failed", it) }
         engine = null
         XrayRunner.stop(xraySession)
@@ -279,6 +296,7 @@ class RadxVpnService : VpnService() {
         settings: AppSettings,
         xrayReady: Boolean,
         xraySkip: Set<Int>,
+        proxyPort: Int,
     ) {
         val spec = lastTunSpec
         val xrayIndexes = profile.nodes.withIndex()
@@ -300,11 +318,7 @@ class RadxVpnService : VpnService() {
             excludedApps = spec?.excludePackages.orEmpty(),
             xrayNodes = if (xrayReady) xrayIndexes.size else 0,
             xrayPorts = if (xrayReady) xrayIndexes.map { XrayBridge.port(it) } else emptyList(),
-            proxyPort = if (settings.tunnelMode == TunnelMode.PROXY) {
-                settings.proxyPort
-            } else {
-                0
-            },
+            proxyPort = if (settings.tunnelMode == TunnelMode.PROXY || settings.localProxy) proxyPort else 0,
         )
         TunnelInfoStore.set(info)
         CoreLog.add(
@@ -324,6 +338,51 @@ class RadxVpnService : VpnService() {
     }
 
     private fun directory(name: String): File = File(filesDir, name).apply { mkdirs() }
+
+    // ----------------------------------------------------- notification extras
+
+    /** A free loopback port for a dynamically allocated local proxy. */
+    private fun freePort(): Int = runCatching {
+        ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { it.localPort }
+    }.getOrDefault(7890)
+
+    /**
+     * Keeps the ongoing notification in step with the tunnel when the speed display is
+     * on. The rates come from the same per-UID counters the traffic tiles use.
+     */
+    private fun startSpeedUpdates(nodeName: String, settings: AppSettings) {
+        speedJob?.cancel()
+        speedJob = null
+        if (!settings.speedDisplay) return
+        speedJob = scope.launch {
+            val monitor = TrafficMonitor()
+            monitor.reset()
+            while (true) {
+                delay(NOTIFICATION_SPEED_INTERVAL_MS)
+                val snapshot = monitor.sample()
+                runCatching {
+                    getSystemService(NotificationManager::class.java)?.notify(
+                        NOTIFICATION_ID,
+                        buildNotification(
+                            getString(R.string.status_connected) + " · " + nodeName,
+                            getString(
+                                R.string.notification_speeds,
+                                formatRate(snapshot.downloadRate),
+                                formatRate(snapshot.uploadRate),
+                            ),
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    private fun formatRate(bytesPerSecond: Long): String = when {
+        bytesPerSecond >= 1024L * 1024L ->
+            String.format(Locale.US, "%.1f MB/s", bytesPerSecond / (1024.0 * 1024.0))
+        bytesPerSecond >= 1024L -> String.format(Locale.US, "%.0f KB/s", bytesPerSecond / 1024.0)
+        else -> "$bytesPerSecond B/s"
+    }
 
     // ------------------------------------------------------------------ tun
 
@@ -441,6 +500,7 @@ class RadxVpnService : VpnService() {
         private const val TAG = "RadxVpnService"
         private const val CHANNEL_ID = "radx_tunnel"
         private const val NOTIFICATION_ID = 4711
+        private const val NOTIFICATION_SPEED_INTERVAL_MS = 2_000L
 
         const val ACTION_START = "com.radx.app.action.START"
         const val ACTION_STOP = "com.radx.app.action.STOP"

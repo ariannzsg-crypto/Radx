@@ -2,8 +2,11 @@ package com.radx.app.ui
 
 import android.app.Activity
 import android.content.Intent
+import android.content.res.Configuration
 import android.net.Uri
 import android.net.VpnService
+import android.text.TextUtils
+import android.view.View
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -43,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -65,16 +69,52 @@ import com.radx.app.ui.screens.NodesScreen
 import com.radx.app.ui.screens.SettingsScreen
 import com.radx.app.ui.theme.RadxTheme
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 @Composable
 fun RadxApp(viewModel: RadxViewModel) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    RadxTheme(accent = state.settings.accent) {
-        CompositionLocalProvider(LocalGlassEffects provides state.settings.glassEffects) {
-            GlassBackdrop {
-                RadxAppContent(state = state, viewModel = viewModel)
+    LocalizedContent(state.settings.language) {
+        RadxTheme(accent = state.settings.accent, dynamicColor = state.settings.dynamicColor) {
+            CompositionLocalProvider(LocalGlassEffects provides state.settings.glassEffects) {
+                GlassBackdrop {
+                    RadxAppContent(state = state, viewModel = viewModel)
+                }
             }
         }
+    }
+}
+
+/**
+ * Applies the language picked in the settings without restarting the activity.
+ *
+ * The strings and the reading direction come from a localised context, so a Persian
+ * interface stays RTL on an English device and the other way round.
+ */
+@Composable
+private fun LocalizedContent(language: String, content: @Composable () -> Unit) {
+    if (language == "auto") {
+        content()
+        return
+    }
+    val base = LocalContext.current
+    val baseConfiguration = LocalConfiguration.current
+    val locale = remember(language) { Locale.forLanguageTag(language) }
+    val configuration = remember(language, baseConfiguration) {
+        Configuration(baseConfiguration).apply { setLocale(locale) }
+    }
+    val localized = remember(configuration) { base.createConfigurationContext(configuration) }
+    val direction = if (TextUtils.getLayoutDirectionFromLocale(locale) == View.LAYOUT_DIRECTION_RTL) {
+        LayoutDirection.Rtl
+    } else {
+        LayoutDirection.Ltr
+    }
+    CompositionLocalProvider(
+        LocalContext provides localized,
+        LocalConfiguration provides configuration,
+        LocalLayoutDirection provides direction,
+    ) {
+        content()
     }
 }
 
@@ -223,7 +263,13 @@ private fun RadxAppContent(state: UiState, viewModel: RadxViewModel) {
                     onOpenNodes = { tab = 1 },
                     onSelectProfile = viewModel::selectProfile,
                     onUpdateProfile = { profile -> viewModel.refreshSubscription(profile.id) },
-                    onDeleteProfile = { profile -> deleteTarget = profile },
+                    onDeleteProfile = { profile ->
+                        if (state.settings.deleteConfirm) {
+                            deleteTarget = profile
+                        } else {
+                            viewModel.deleteProfile(profile.id)
+                        }
+                    },
                     onCopyProfile = { profile ->
                         copyText(profile.raw.ifBlank { profile.subscriptionUrl.orEmpty() })
                     },
@@ -231,12 +277,16 @@ private fun RadxAppContent(state: UiState, viewModel: RadxViewModel) {
                         shareText(profile.raw.ifBlank { profile.subscriptionUrl.orEmpty() })
                     },
                     onShowQr = { profile -> qrTarget = profile },
+                    onSetTunnelMode = { mode ->
+                        viewModel.updateSettings { it.copy(tunnelMode = mode) }
+                    },
                 )
 
                 1 -> NodesScreen(
                     state = state,
                     onSelect = viewModel::selectNode,
                     onPing = viewModel::pingAll,
+                    twoColumns = state.settings.twoColumnLayout,
                 )
 
                 2 -> LogsScreen(onCopy = copyText)

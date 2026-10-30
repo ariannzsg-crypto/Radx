@@ -1,6 +1,8 @@
 package com.radx.app.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -45,6 +47,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -67,6 +71,7 @@ import com.radx.app.ui.components.RadxCard
 import com.radx.app.ui.components.SectionHeader
 import com.radx.app.ui.components.StatusPill
 import com.radx.app.ui.components.TrafficTile
+import com.radx.app.ui.components.TunnelModeSwitch
 import com.radx.app.ui.theme.RadxBlue
 import com.radx.app.ui.theme.RadxCyan
 import com.radx.app.ui.theme.RadxError
@@ -86,6 +91,7 @@ fun HomeScreen(
     onCopyProfile: (Profile) -> Unit,
     onShareProfile: (Profile) -> Unit,
     onShowQr: (Profile) -> Unit,
+    onSetTunnelMode: (TunnelMode) -> Unit,
 ) {
     val connection = state.connection
     val connectedSince = (connection as? ConnectionState.Connected)?.since ?: 0L
@@ -131,7 +137,34 @@ fun HomeScreen(
                     onClick = onToggle,
                 )
                 StatusSummary(connection = connection, elapsed = elapsed)
+                Spacer(Modifier.height(16.dp))
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color.Transparent, Color(0x26FFFFFF), Color.Transparent),
+                            ),
+                        ),
+                )
+                Spacer(Modifier.height(12.dp))
+                TrafficStrip(
+                    download = Formatters.rate(state.traffic.downloadRate),
+                    upload = Formatters.rate(state.traffic.uploadRate),
+                    total = Formatters.bytes(
+                        state.traffic.totalDownload + state.traffic.totalUpload,
+                    ),
+                )
             }
+        }
+
+        item {
+            TunnelModeSwitch(
+                selected = state.settings.tunnelMode,
+                enabled = !state.busy,
+                onSelect = onSetTunnelMode,
+            )
         }
 
         item {
@@ -140,27 +173,6 @@ fun HomeScreen(
 
         item {
             ActiveNodeCard(state = state, onOpenNodes = onOpenNodes)
-        }
-
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                TrafficTile(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Rounded.ArrowDownward,
-                    label = stringResource(R.string.download),
-                    value = Formatters.rate(state.traffic.downloadRate),
-                    total = Formatters.bytes(state.traffic.totalDownload),
-                    tint = RadxCyan,
-                )
-                TrafficTile(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Rounded.ArrowUpward,
-                    label = stringResource(R.string.upload),
-                    value = Formatters.rate(state.traffic.uploadRate),
-                    total = Formatters.bytes(state.traffic.totalUpload),
-                    tint = RadxBlue,
-                )
-            }
         }
 
         item {
@@ -217,6 +229,37 @@ fun HomeScreen(
         }
 
         item { Spacer(Modifier.height(8.dp)) }
+    }
+}
+
+/**
+ * Down, up and the session total under the cloud.
+ *
+ * The three numbers sit in the hero panel itself, so the state of the tunnel and what it
+ * is carrying read as one block instead of two separate cards.
+ */
+@Composable
+private fun TrafficStrip(download: String, upload: String, total: String) {
+    Row(modifier = Modifier.fillMaxWidth()) {
+        StatColumn(stringResource(R.string.download), download, Modifier.weight(1f))
+        StatColumn(stringResource(R.string.upload), upload, Modifier.weight(1f))
+        StatColumn(stringResource(R.string.total_usage), total, Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun StatColumn(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = RadxTextSecondary,
+        )
+        Spacer(Modifier.height(3.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium,
+        )
     }
 }
 
